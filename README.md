@@ -174,6 +174,23 @@ curl -s localhost:8000/v1/systemone \
 
 `ask` and `serve` also read `h2oai/h2o-lightning-4b` checkpoints ([docs/h2o-lightning.md](docs/h2o-lightning.md)).
 
+#### This fork: h2o-lightning-4b on current main
+
+The h2o-lightning-4b support was written by
+[yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b)
+(`feat/h2o-lightning-4b`). Upstream keeps this repository for strands-decider models
+([issue #95](https://github.com/strands-labs/strands-decider/issues/95)), so it lives in forks.
+This branch merges that work onto current `main` (the engine built in the server's lifespan,
+`--device-map`, `--max-concurrency`, `--warmup`) and adds `--noul-floor`.
+
+Checked against a robot-arm decision task: the 19 recorded requests of an SO-101 pick-and-place
+kit ([pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider)),
+sent to `strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way
+--noul-floor 0 --device mps`, chose the same skill as h2o's own serving (community MLX build,
+8-bit) on 19 of 19, with the same pass/stop verdict on all 19. The choice confidence differed by
+at most 0.029 and the safety yes/no probability by at most 0.009. All 7 deliberately failed
+observations were stopped.
+
 ### Images
 
 Qwen3.5-2B-Base is natively multimodal. With `--vision` the server keeps its vision tower,

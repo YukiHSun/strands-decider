@@ -169,6 +169,20 @@ strands-decider serve h2oai/h2o-lightning-4b --port 8000
 strands-decider serve h2oai/h2o-lightning-4b --vision --port 8000   # requests may carry images
 ```
 
+### The yes/no floor: `--noul-floor`
+
+h2o's `serve_config.json` sets a yes/no floor (`noul_floor`, 0.801): an answer less sure than that
+is reported at the floor on its own side, so every unsure yes/no answer comes back as 0.801 or
+0.199. A caller that compares a yes/no probability with its own threshold (act only above 0.60,
+say) then never sees the raw probability. `--noul-floor` on `ask` and `serve` (`noul_floor=` on
+`load_engine` and `create_app`) replaces the floor for every build, torch, MLX or llama-server.
+`--noul-floor 0` turns it off, as h2o's own `SHIM_NOUL_FLOOR=0` does; unset, the checkpoint's
+floor applies.
+
+```bash
+strands-decider serve h2oai/h2o-lightning-4b --noul-floor 0 --port 8000
+```
+
 A checkpoint is read as h2o-lightning when it has `serve_config.json` and has neither
 `strands_decider_config.json` nor `hobson_config.json`. The same rule applies to a local folder
 and to a Hub repo. Everything else loads exactly as before. For a Hub id, the check fetches
