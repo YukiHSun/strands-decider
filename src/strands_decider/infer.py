@@ -21,6 +21,7 @@ fallback is a safety valve rather than a different model.
 from __future__ import annotations
 
 import copy
+import os
 import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -53,6 +54,7 @@ from .schema import (
 )
 
 if TYPE_CHECKING:
+    from .clef import ClefEngine
     from .h2o import H2OEngine
 
 
@@ -452,7 +454,7 @@ def load_engine(
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
     noul_floor: float | None = None,
-) -> SystemOneEngine | H2OEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine:
     """`_load_engine` (below), then `noul_floor` on an h2o-lightning engine: the yes/no floor its
     answers are committed to (None: the checkpoint's; 0: off). Not used for a strands-decider
     checkpoint, whose yes/no answers have no floor."""
@@ -489,7 +491,7 @@ def _load_engine(
     engine: str = "local",
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
-) -> SystemOneEngine | H2OEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine:
     """An engine on a torch device ("cuda", "mps", "cpu"), or on MLX with `device="mlx"`.
 
     An h2o-lightning checkpoint (`serve_config.json` and no decider config, see h2o.py) gives an
@@ -545,6 +547,19 @@ def _load_engine(
             attention=attention,
             attn_implementation=attn_implementation,
             vision=vision,
+        )
+    from .clef import load_clef_engine
+    from .clef import resolve as resolve_clef
+
+    clef_path = resolve_clef(checkpoint, revision)
+    if clef_path is not None:
+        if device == "mlx":
+            raise ValueError("a Clef checkpoint runs on torch devices (cuda, mps, cpu), not mlx")
+        return load_clef_engine(
+            clef_path,
+            device=device,
+            model_name=os.path.basename(checkpoint.rstrip("/")) or checkpoint,
+            attn_implementation=attn_implementation,
         )
     if revision is not None:
         checkpoint = checkpoint_dir(checkpoint, revision)

@@ -41,6 +41,11 @@
 >   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
 >   on its 19 recorded decisions this branch chose the same skill as h2o's own serving on 19 of
 >   19 and stopped all 7 deliberately failed observations (section 10.6 of its report).
+>
+> **Branch `feat/clef-flash` (this one) also adds [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash)**
+> (9B, Apache-2.0): `strands-decider serve Cloudflare/clef-flash --device cuda` (or `mps`). Its
+> answers match the release's reference implementation exactly; usage and the SO-101 check are in
+> [docs/clef.md](docs/clef.md).
 
 Strands decider is one of a new class of **decision models**, or "system one" models. Unlike an
 LLM, which can generate arbitrary text, a decision model picks between sets of options and

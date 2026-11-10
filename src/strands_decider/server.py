@@ -19,6 +19,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from . import __version__
+from .clef import ClefEngine, load_clef_engine
+from .clef import resolve as resolve_clef
 from .h2o import H2OEngine, H2OEngineConfig, load_h2o_engine, resolve
 from .infer import EngineConfig, SystemOneEngine, load_mlx
 from .modeling import StrandsDeciderModel, checkpoint_dir
@@ -39,7 +41,9 @@ def _needs_serialisation(device: str) -> bool:
     return str(device).startswith("mps")
 
 
-def warm_up(engine: SystemOneEngine | H2OEngine, max_batch: int, vision: bool = False) -> None:
+def warm_up(
+    engine: SystemOneEngine | H2OEngine | ClefEngine, max_batch: int, vision: bool = False
+) -> None:
     """Ask every question kind, then every number of questions up to `max_batch`, once.
 
     On CUDA the first forward of a shape compiles kernels (Triton's, on a Qwen3.5 torso), once
@@ -65,7 +69,9 @@ def warm_up(engine: SystemOneEngine | H2OEngine, max_batch: int, vision: bool = 
     print(f"[strands-decider] warmed up in {time.perf_counter() - started:.1f} s")
 
 
-def _warm_up_image(engine: SystemOneEngine | H2OEngine, state: str, question: Question) -> None:
+def _warm_up_image(
+    engine: SystemOneEngine | H2OEngine | ClefEngine, state: str, question: Question
+) -> None:
     """One image request: the first one initialises the image path; after it, image requests
     reuse the text path's kernels, whatever the number of questions or images. The image is
     small, so the request fits any window.
@@ -116,7 +122,7 @@ def create_app(
     max_batch_tokens: int | None = None,
     device_map: str | None = None,
     warmup: bool = True,
-    build_engine: Callable[[], SystemOneEngine | H2OEngine] | None = None,
+    build_engine: Callable[[], SystemOneEngine | H2OEngine | ClefEngine] | None = None,
     max_concurrency: int | None = None,
     attention: str | None = None,
     revision: str | None = None,
@@ -164,7 +170,7 @@ def create_app(
         max_batch_tokens=max_batch_tokens,
     )
 
-    def _default_build_engine() -> SystemOneEngine | H2OEngine:
+    def _default_build_engine() -> SystemOneEngine | H2OEngine | ClefEngine:
         if engine == "llama-server":
             llama = load_engine(
                 checkpoint,
@@ -188,6 +194,19 @@ def create_app(
                 model_name=resolved_name,
                 attn_implementation=attn_implementation,
                 vision=vision,
+            )
+        clef_path = resolve_clef(checkpoint, revision)
+        if clef_path is not None:
+            if device == "mlx" or device_map:
+                raise ValueError(
+                    "a Clef checkpoint runs on one torch device (cuda, mps or cpu): "
+                    "--device mlx and --device-map are not supported for it"
+                )
+            return load_clef_engine(
+                clef_path,
+                device=device,
+                model_name=resolved_name,
+                attn_implementation=attn_implementation,
             )
         source = checkpoint if revision is None else checkpoint_dir(checkpoint, revision)
         if vision:
@@ -222,9 +241,10 @@ def create_app(
                 # shape does not depend on how many questions it has: the three kinds suffice.
                 # A llama-server warms itself: warming it from here would only send it requests.
                 if engine_name != "llama-server":
-                    warm_up(
-                        engine, 1 if isinstance(engine, H2OEngine) else max_batch, vision=vision
-                    )
+                    # A Clef engine answers a request in one forward of one record, whatever
+                    # its number of questions: the three kinds suffice there too.
+                    one = isinstance(engine, H2OEngine | ClefEngine)
+                    warm_up(engine, 1 if one else max_batch, vision=vision)
             yield
         finally:
             # The MLX engine owns a worker thread (see mlx_engine.MLXEngine); other engines
@@ -260,7 +280,7 @@ def create_app(
     async def health(eng: Any = Depends(get_engine)) -> dict:
         fields = (
             eng.health_fields()
-            if isinstance(eng, H2OEngine)
+            if isinstance(eng, H2OEngine | ClefEngine)
             else {
                 "base_model": eng.model.config.base_model,
                 "max_length": eng.model.config.max_length,
@@ -277,7 +297,9 @@ def create_app(
             "vision": vision,
         }
 
-    def evaluate(eng: SystemOneEngine | H2OEngine, request: SystemOneRequest) -> SystemOneResponse:
+    def evaluate(
+        eng: SystemOneEngine | H2OEngine | ClefEngine, request: SystemOneRequest
+    ) -> SystemOneResponse:
         with guard:
             return eng.evaluate(request)
 
