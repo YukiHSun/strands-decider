@@ -104,11 +104,6 @@ def serve_cmd(
         "--model-name",
         help="Value returned as `model` in responses. Defaults to the checkpoint basename.",
     ),
-    strict_window: bool = typer.Option(
-        False,
-        "--strict-window",
-        help="Reject (HTTP 422) a prompt longer than the context window instead of truncating it.",
-    ),
     vision: bool = typer.Option(
         False,
         "--vision",
@@ -123,6 +118,24 @@ def serve_cmd(
         None,
         "--max-batch-tokens",
         help="Also cap one forward's padded tokens (questions x longest state + question); for long-context torsos.",
+    ),
+    device_map: str | None = typer.Option(
+        None,
+        "--device-map",
+        help="Split the model across the visible GPUs (a transformers device_map, such as auto), "
+        "for a model larger than one GPU.",
+    ),
+    max_concurrency: int | None = typer.Option(
+        None,
+        "--max-concurrency",
+        min=1,
+        help="Run at most N requests on the model at once; the rest wait without a thread or GPU "
+        "memory. Default: no cap beyond the 40-thread worker pool.",
+    ),
+    warmup: bool = typer.Option(
+        True,
+        "--warmup/--no-warmup",
+        help="Answer every request shape once before serving, so no request waits for a compile.",
     ),
     attention: str | None = typer.Option(
         None,
@@ -149,10 +162,12 @@ def serve_cmd(
         device=selected_device,
         use_prefix_cache=not no_prefix_cache,
         model_name=model_name,
-        strict_window=strict_window,
         max_batch=max_batch,
         vision=vision,
         max_batch_tokens=max_batch_tokens,
+        device_map=device_map,
+        max_concurrency=max_concurrency,
+        warmup=warmup,
         attention=attention,
         revision=revision,
         engine=engine,

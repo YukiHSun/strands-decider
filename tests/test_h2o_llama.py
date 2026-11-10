@@ -291,19 +291,18 @@ def test_a_request_cannot_change_the_address(settings, fake, monkeypatch):
     """Fields of a request that look like an address (`model`, unknown keys) never change where
     the question is sent."""
     monkeypatch.delenv(h2o_llama.URL_ENV, raising=False)
-    client = TestClient(
-        server.create_app(str(settings), engine="llama-server", llama_server_url=fake.url)
-    )
+    app = server.create_app(str(settings), engine="llama-server", llama_server_url=fake.url)
     body = {
         "state": STATE,
         "questions": {"q": QUESTIONS["urgent"].model_dump()},
         "model": "http://203.0.113.9:8080",
         "llama_server_url": "http://203.0.113.9:8080",
     }
-    r = client.post("/v1/systemone", json=body)
-    assert r.status_code == 200, r.text
-    assert len(fake.bodies) == 1  # it reached the fake server, the only one it can reach
-    assert server.get_engine().backend.url == fake.url
+    with TestClient(app) as client:
+        r = client.post("/v1/systemone", json=body)
+        assert r.status_code == 200, r.text
+        assert len(fake.bodies) == 1  # it reached the fake server, the only one it can reach
+        assert client.app.state.engine.backend.url == fake.url
 
 
 def test_a_remote_address_warns_once_and_this_machine_does_not(settings):
@@ -529,15 +528,14 @@ def test_ask_and_serve_answer_through_the_server_and_report_its_failures(
     result = _ask([*args, "--json"], monkeypatch)
     assert result.exit_code == 0, result.output
     SystemOneResponse.model_validate(json.loads(result.output))
-    client = TestClient(
-        server.create_app(str(settings), engine="llama-server", llama_server_url=fake.url)
-    )
-    health = client.get("/health").json()
-    assert health["device"] == "llama-server" and health["model"] == settings.name
-    body = {"state": STATE, "questions": {"q": QUESTIONS["team"].model_dump()}}
-    assert client.post("/v1/systemone", json=body).status_code == 200
-    fake.reply = lambda body: (503, b'{"error": "loading model"}')
-    r = client.post("/v1/systemone", json=body)
-    assert r.status_code == 502 and fake.url in r.json()["detail"]
+    app = server.create_app(str(settings), engine="llama-server", llama_server_url=fake.url)
+    with TestClient(app) as client:
+        health = client.get("/health").json()
+        assert health["device"] == "llama-server" and health["model"] == settings.name
+        body = {"state": STATE, "questions": {"q": QUESTIONS["team"].model_dump()}}
+        assert client.post("/v1/systemone", json=body).status_code == 200
+        fake.reply = lambda body: (503, b'{"error": "loading model"}')
+        r = client.post("/v1/systemone", json=body)
+        assert r.status_code == 502 and fake.url in r.json()["detail"]
     result = _ask(args, monkeypatch)
     assert result.exit_code != 0 and "HTTP 503" in result.output

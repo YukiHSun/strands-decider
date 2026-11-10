@@ -379,18 +379,18 @@ def test_ask_and_serve_answer_with_images(vckpt, tmp_path, monkeypatch):
     result = _ask([str(vckpt), *ASK, "--image", str(image), "--json"], monkeypatch)
     assert result.exit_code == 0, result.output
     SystemOneResponse.model_validate(json.loads(result.output))
-    client = TestClient(server.create_app(str(vckpt), device="cpu", vision=True))
-    assert client.get("/health").json()["vision"] is True
     body = {
         "state": STATE,
         "questions": {name: q.model_dump() for name, q in QUESTIONS.items()},
         "images": [_picture("red")],
     }
-    r = client.post("/v1/systemone", json=body)
-    assert r.status_code == 200, r.text
-    SystemOneResponse.model_validate({k: v for k, v in r.json().items() if k != "latency_ms"})
-    r = client.post("/v1/systemone", json={**body, "images": [_picture("red")] * 3})
-    assert r.status_code == 422 and "at most 2" in r.json()["detail"]
+    with TestClient(server.create_app(str(vckpt), device="cpu", vision=True)) as client:
+        assert client.get("/health").json()["vision"] is True
+        r = client.post("/v1/systemone", json=body)
+        assert r.status_code == 200, r.text
+        SystemOneResponse.model_validate({k: v for k, v in r.json().items() if k != "latency_ms"})
+        r = client.post("/v1/systemone", json={**body, "images": [_picture("red")] * 3})
+        assert r.status_code == 422 and "at most 2" in r.json()["detail"]
 
 
 def test_images_on_mlx_are_refused_before_mlx_loads(vckpt, tmp_path, monkeypatch):

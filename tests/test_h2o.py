@@ -338,7 +338,7 @@ def test_an_mlx_quantised_build_is_read_only_on_mlx(ckpt, tmp_path, monkeypatch)
     assert h2o.is_mlx_quantised(str(quantised)) and not h2o.is_mlx_quantised(str(ckpt))
     for load in (
         lambda: infer.load_engine(str(quantised), device="cpu"),
-        lambda: server.create_app(str(quantised), device="cpu"),
+        lambda: _started(server.create_app(str(quantised), device="cpu", warmup=False)),
         lambda: h2o.load_h2o_engine(str(quantised), device="cpu"),
     ):
         with pytest.raises(ValueError, match=r"MLX-quantised.*only with --device mlx"):
@@ -363,8 +363,7 @@ def test_without_attention_the_hf_build_reads_two_way(ckpt, monkeypatch):
 
     monkeypatch.setattr(h2o, "load_h2o_engine", spy)
     assert infer.load_engine(str(ckpt), device="cpu").attention == "two-way"
-    server.create_app(str(ckpt), device="cpu")
-    assert server.get_engine().attention == "two-way"
+    assert _started(server.create_app(str(ckpt), device="cpu", warmup=False)).attention == "two-way"
     assert _ask([str(ckpt), *ASK], monkeypatch).exit_code == 0
     assert loaded == ["two-way"] * 2  # load_engine and ask (create_app is checked above)
 
@@ -657,6 +656,14 @@ def test_a_long_state_is_refused_and_the_prompt_is_tokenised_once(two_way, monke
 # ---------------------------------------------------------------- ask and serve
 
 from fastapi.testclient import TestClient  # noqa: E402
+
+
+def _started(app):
+    """The engine `app` serves: it is built when the server starts (the lifespan), as on main."""
+    with TestClient(app) as client:
+        return client.app.state.engine
+
+
 from typer.testing import CliRunner  # noqa: E402
 
 from strands_decider import cli, server  # noqa: E402
@@ -725,13 +732,14 @@ def test_one_way_is_selected_from_ask_and_create_app(ckpt, monkeypatch):
     assert _ask([str(ckpt), *ASK, "--attention", "one-way"], monkeypatch).exit_code == 0
     assert _ask([str(ckpt), *ASK, "--attention", "sideways"], monkeypatch).exit_code != 0
     assert loaded == ["one-way"]
-    server.create_app(str(ckpt), device="cpu", attention="one-way")
-    assert server.get_engine().attention == "one-way"
+    app = server.create_app(str(ckpt), device="cpu", attention="one-way", warmup=False)
+    assert _started(app).attention == "one-way"
 
 
 @pytest.fixture(scope="module")
 def client(ckpt):
-    return TestClient(server.create_app(str(ckpt), device="cpu"))
+    with TestClient(server.create_app(str(ckpt), device="cpu")) as c:
+        yield c
 
 
 def test_serve_answers_and_health_keep_the_decider_shape(client, ckpt):
@@ -813,7 +821,7 @@ def test_device_mlx_without_mlx_names_the_extra(ckpt, monkeypatch):
     with pytest.raises(RuntimeError, match=r"strands-decider\[mlx\]"):
         infer.load_engine(str(ckpt), device="mlx")
     with pytest.raises(RuntimeError, match=r"strands-decider\[mlx\]"):
-        server.create_app(str(ckpt), device="mlx")
+        _started(server.create_app(str(ckpt), device="mlx", warmup=False))
 
 
 def test_mlx_reads_the_output_rows_torch_reads(monkeypatch):

@@ -22,16 +22,16 @@ CPU), so they report the numbers serving returns. `--device mlx` is refused.
 - [Asking many questions is nearly free](#asking-many-questions-is-nearly-free): the shared-prefix cache.
 - [Serving on a Mac](#serving-on-a-mac): MPS, and the one kernel that had to be replaced.
 - [Serving on a Mac with MLX](#serving-on-a-mac-with-mlx): `--device mlx`, measured against MPS.
-- [`../deploy/`](../deploy/README.md): hosting the server, for example on an Amazon SageMaker
+- [Deployment guide](../deploy/README.md): hosting the server, for example on an Amazon SageMaker
   real-time endpoint.
-- [`../examples/strands/`](../examples/strands/README.md): an agent built with the Strands
+- [Strands Agents example](../examples/strands/README.md): an agent built with the Strands
   Agents SDK that uses the server, with its client in `_client.py`.
-- [`../evaluation/results.md`](../evaluation/results.md): measured latency and accuracy on an
-  RTX 3090 and on a Mac; [`../evaluation/jevbench.md`](../evaluation/jevbench.md): JevBench,
+- [Evaluation results](../evaluation/results.md): measured latency and accuracy on an
+  RTX 3090 and on a Mac; [JevBench results](../evaluation/jevbench.md): JevBench,
   the external benchmark.
-- [`../docs/architecture.md`](../docs/architecture.md#the-routing-convention): the confidence
+- [Architecture](architecture.md#the-routing-convention): the confidence
   formulas and the routing convention.
-- [`../training/README.md`](../training/README.md): how to train a checkpoint.
+- [Training guide](../training/README.md): how to train a checkpoint.
 
 Paths are relative to the repository root unless they are links. A module path such as
 `mps_kernels.py` is relative to `src/strands_decider/`.
@@ -53,7 +53,7 @@ from a clone, for example `pip install -e ".[mlx]"`.
 | `cuda` | `pip install "strands-decider[cuda]"` | flash-linear-attention (Linux). causal-conv1d compiles against the local CUDA toolkit and is installed separately: `pip install causal-conv1d --no-build-isolation`. |
 | `mps` | `pip install "strands-decider[mps]"` | Nothing: the base install. |
 | `cpu` | `pip install "strands-decider[cpu]"` | Nothing: the base install. |
-| `mlx` | `pip install "strands-decider[mlx]"` | mlx and mlx-lm (Apple silicon only). |
+| `mlx` | `pip install "strands-decider[mlx]"` | mlx and mlx-lm (Python 3.11+, Apple silicon only). |
 
 flash-linear-attention installs on a Mac without Triton, but its kernels need Triton, so it
 cannot run there. `mps_kernels.py` therefore steps aside only when Triton is present too, and
@@ -212,7 +212,9 @@ Compatibility with the Jev API itself is not verified. `GET /health` returns the
 name, the checkpoint path, the base model, the device and the calibration temperature.
 `GET /ping` and `POST /invocations` are the same as `/health` and `/v1/systemone`: they are
 the paths that SageMaker and Bedrock AgentCore Runtime call
-([../deploy/sagemaker/](../deploy/sagemaker/README.md)).
+([SageMaker deployment guide](../deploy/sagemaker/README.md)). `/health` and `/ping` answer at once
+even while every worker thread is busy with requests, as a load balancer's health check
+expects (SageMaker allows `/ping` 2 s).
 
 The server binds to `127.0.0.1` by default and has no authentication. Its behaviour under
 concurrent requests is not verified. Use it for local experiments only
@@ -239,10 +241,8 @@ The `state` may be empty when the question carries the whole task. An option des
 may be a string, structured data (rendered as JSON, like a structured `state`), or `null`
 for a bare label.
 
-By default a prompt longer than the checkpoint's window is shortened to fit: the state is
-cut, and the question keeps its options. `--strict-window` refuses such a prompt instead,
-with HTTP 422 and a message that names the context window, for an evaluation that forbids
-truncation. `--max-batch N` (default 32) sets how many questions one forward pass encodes;
+A prompt longer than the checkpoint's window is refused with HTTP 422 and a message that
+names the context window. `--max-batch N` (default 32) sets how many questions one forward pass encodes;
 lower it when a very long state with many questions does not fit in GPU memory.
 `--max-batch-tokens N` also caps the tokens of one forward, as the forward pads them: its
 questions times the longest state + question, after each is fitted to the window. A forward
@@ -250,6 +250,20 @@ then ends early, before it would pass N tokens, and always holds at least one qu
 Questions are fitted before the cut and scored independently, so answers change only by
 float rounding. Long-context torsos (Gemma 4 at a 32,768-token window) need it; unset, only
 `--max-batch` applies.
+
+`--device-map auto` splits a model larger than one GPU across the visible GPUs, with the
+transformers `device_map` of the same name; the head runs on `cuda:0`. The layers run one GPU
+after the other, so the split adds memory, not speed. The 26B-A4B serves this way on four
+48 GB L40S GPUs (16 to 21 GB on each), at about 200 ms for one short question and 370 ms for
+two, with probabilities within 0.03 of the model on CPU. CUDA only, and not with `--vision`.
+
+The server warms up before it accepts requests, so no request waits for a kernel to compile:
+it asks each question kind once, then every number of questions up to `--max-batch` (larger
+requests run in chunks of at most that many), and with `--vision` one image request. `/health`
+and `/ping` fail until it is done, so
+startup and health-check timeouts must allow for it. `--no-warmup` skips it.
+
+`--max-concurrency N` runs at most N requests on the model at once; the others wait, holding no worker thread and no GPU memory, and run as earlier ones finish. Without it, up to 40 requests (the worker thread pool) run at once, and a burst of large requests can run the GPU out of memory. A request's questions are already batched on the GPU, so a small N (a few) keeps most of the throughput.
 
 ## Gemma 4 models
 
