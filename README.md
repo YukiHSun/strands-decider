@@ -23,6 +23,25 @@
 
 <hr>
 
+> [!NOTE]
+> **This fork branch (`feat/h2o-lightning-4b-on-main`) adds [h2oai/h2o-lightning-4b](https://huggingface.co/h2oai/h2o-lightning-4b) support.**
+> `strands-decider ask` and `strands-decider serve` load h2o-lightning-4b the same way as a
+> strands-decider checkpoint (torch, MLX, images, or a llama-server running its GGUF build), on
+> top of current upstream `main`. `--noul-floor 0` keeps raw yes/no probabilities.
+>
+> ```bash
+> strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps
+> ```
+>
+> - Usage: [docs/h2o-lightning.md](docs/h2o-lightning.md). The h2o-lightning support is by
+>   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b);
+>   this branch merges it onto current `main` and adds `--noul-floor`
+>   ([details](#this-fork-h2o-lightning-4b-on-current-main)).
+> - Checked with an SO-101 robot-arm pick-and-place kit,
+>   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
+>   on its 19 recorded decisions this branch chose the same skill as h2o's own serving on 19 of
+>   19 and stopped all 7 deliberately failed observations (section 10.6 of its report).
+
 Strands decider is one of a new class of **decision models**, or "system one" models. Unlike an
 LLM, which can generate arbitrary text, a decision model picks between sets of options and
 rates things on a scale. This class of model works best for problems that fall between LLMs
