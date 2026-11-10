@@ -24,28 +24,32 @@
 <hr>
 
 > [!NOTE]
-> **This fork branch (`feat/h2o-lightning-4b-on-main`) adds [h2oai/h2o-lightning-4b](https://huggingface.co/h2oai/h2o-lightning-4b) support.**
-> `strands-decider ask` and `strands-decider serve` load h2o-lightning-4b the same way as a
-> strands-decider checkpoint (torch, MLX, images, or a llama-server running its GGUF build), on
-> top of current upstream `main`. `--noul-floor 0` keeps raw yes/no probabilities.
+> **This fork branch (`feat/clef-flash`) adds two decision models from other vendors, on top of current upstream `main`:**
+> [h2oai/h2o-lightning-4b](https://huggingface.co/h2oai/h2o-lightning-4b) and
+> [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash).
+> `strands-decider ask` and `strands-decider serve` load either the same way as a strands-decider
+> checkpoint, behind the same `POST /v1/systemone` API and with the same answer shape.
 >
 > ```bash
+> strands-decider serve Cloudflare/clef-flash --device cuda        # or --device mps
 > strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps
 > ```
 >
-> - Usage: [docs/h2o-lightning.md](docs/h2o-lightning.md). The h2o-lightning support is by
->   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b);
->   this branch merges it onto current `main` and adds `--noul-floor`
->   ([details](#this-fork-h2o-lightning-4b-on-current-main)).
-> - Checked with an SO-101 robot-arm pick-and-place kit,
->   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
->   on its 19 recorded decisions this branch chose the same skill as h2o's own serving on 19 of
->   19 and stopped all 7 deliberately failed observations (section 10.6 of its report).
+> | Model | What this branch adds | Usage | SO-101 kit check |
+> |---|---|---|---|
+> | h2o-lightning-4b (4B) | torch, MLX, images, or a llama-server running its GGUF build; `--noul-floor 0` keeps raw yes/no probabilities | [docs/h2o-lightning.md](docs/h2o-lightning.md) | same skill as h2o's own serving on 19 of 19 recorded decisions |
+> | clef-flash (9B, Apache-2.0) | torch (`cuda`, `mps`, `cpu`), images; answers match the release's reference implementation exactly | [docs/clef.md](docs/clef.md) | 13 of 15 successful steps passed the gates (Jev 1.14: 15 of 15) |
 >
-> **Branch `feat/clef-flash` (this one) also adds [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash)**
-> (9B, Apache-2.0): `strands-decider serve Cloudflare/clef-flash --device cuda` (or `mps`). Its
-> answers match the release's reference implementation exactly; usage and the SO-101 check are in
-> [docs/clef.md](docs/clef.md).
+> - The h2o-lightning support is by
+>   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b),
+>   merged onto current `main` in
+>   [`feat/h2o-lightning-4b-on-main`](https://github.com/YukiHSun/strands-decider/tree/feat/h2o-lightning-4b-on-main),
+>   which adds `--noul-floor` ([details](#this-fork-h2o-lightning-4b-on-current-main)). The
+>   Clef support is new in this branch.
+> - Both were checked with an SO-101 robot-arm pick-and-place kit,
+>   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
+>   19 recorded decisions and 7 deliberately failed observations, all 7 of which both models
+>   stopped (h2o-lightning: section 10.6 of its report; Clef: [docs/clef.md](docs/clef.md)).
 
 Strands decider is one of a new class of **decision models**, or "system one" models. Unlike an
 LLM, which can generate arbitrary text, a decision model picks between sets of options and
