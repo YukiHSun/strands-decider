@@ -123,6 +123,7 @@ def create_app(
     engine: str = "local",
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
+    noul_floor: float | None = None,
 ) -> FastAPI:
     """The app for `checkpoint`. An h2o-lightning checkpoint (see h2o.py) is read with
     `attention` ("two-way" or "one-way"; None: the build's default, two-way for the HF build,
@@ -131,13 +132,14 @@ def create_app(
     vision tower, on torch devices only. `engine="llama-server"` answers through a llama-server
     running h2o-lightning's GGUF build at `llama_server_url` (see `infer.load_engine`); its
     failures are HTTP 502."""
-    from .h2o import ATTENTION_MODES, ENGINES, MLX_IMAGES_UNSUPPORTED
+    from .h2o import ATTENTION_MODES, ENGINES, MLX_IMAGES_UNSUPPORTED, check_noul_floor
     from .h2o_llama import LlamaServerError
     from .infer import MLX_EXTRA_MESSAGE, load_engine, mlx_available
 
     if attention is not None and attention not in ATTENTION_MODES:
         raise ValueError(f"attention must be one of {list(ATTENTION_MODES)}, got {attention!r}")
     engine_name = engine
+    floor = check_noul_floor(noul_floor)
     if engine not in ENGINES:
         raise ValueError(f"engine must be one of {list(ENGINES)}, got {engine!r}")
     if device_map and (vision or not device.startswith("cuda")):
@@ -206,6 +208,9 @@ def create_app(
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = build()
+        if isinstance(engine, H2OEngine) and floor is not None:
+            # --noul-floor: the yes/no floor of an h2o-lightning engine, whatever its backend.
+            engine.cfg.noul_floor = floor
         app.state.engine = engine
         # None: requests share anyio's default worker pool (40 threads), as sync handlers do.
         app.state.limiter = anyio.CapacityLimiter(max_concurrency) if max_concurrency else None
@@ -323,6 +328,7 @@ def serve(
     engine: str = "local",
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
+    noul_floor: float | None = None,
 ) -> None:
     import uvicorn
 
@@ -342,6 +348,7 @@ def serve(
         engine=engine,
         llama_server_url=llama_server_url,
         llama_server_timeout=llama_server_timeout,
+        noul_floor=noul_floor,
     )
     # Single worker: the model owns the GPU, and forking more would just duplicate it.
     uvicorn.run(app, host=host, port=port, workers=1)

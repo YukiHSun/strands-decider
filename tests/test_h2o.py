@@ -841,3 +841,45 @@ def test_mlx_reads_the_output_rows_torch_reads(monkeypatch):
     assert not untied.tied
     with pytest.raises(ValueError, match=r"untied output embeddings.*no lm_head"):
         h2o_mlx.MLXBackend(decoder, SimpleNamespace(), "p", tied=False)
+
+
+def test_noul_floor_can_be_set_or_turned_off(ckpt):
+    """`--noul-floor` (load_engine, create_app, ask) replaces the checkpoint's yes/no floor: 0
+    turns it off, so an unsure yes/no answer keeps its raw probability, as h2o's own
+    SHIM_NOUL_FLOOR=0 does. Unset, the checkpoint's floor applies."""
+    request = SystemOneRequest(state=STATE, questions={"q": NoulQuestion(instructions="Urgent?")})
+    default = infer.load_engine(str(ckpt), device="cpu", attention="one-way")
+    assert default.noul_floor() == default.serve_config.floor("one-way") == 0.801
+    raw = infer.load_engine(str(ckpt), device="cpu", attention="one-way", noul_floor=0)
+    assert raw.noul_floor() == 0
+    p_raw = raw.evaluate(request).answers["q"].noul
+    p_default = default.evaluate(request).answers["q"].noul
+    assert p_default == pytest.approx(h2o.commit_noul(p_raw, 0.801), abs=1e-4)
+    strict = infer.load_engine(str(ckpt), device="cpu", attention="one-way", noul_floor=0.99)
+    assert strict.evaluate(request).answers["q"].noul in (0.99, pytest.approx(0.01))
+
+    app = server.create_app(
+        str(ckpt), device="cpu", attention="one-way", noul_floor=0, warmup=False
+    )
+    with TestClient(app) as client:
+        assert client.app.state.engine.noul_floor() == 0
+        r = client.post("/v1/systemone", json=request.model_dump())
+        assert r.json()["answers"]["q"]["noul"] == pytest.approx(p_raw, abs=1e-4)
+
+    for bad in (0.3, 1.0, -0.1):
+        with pytest.raises(ValueError, match="noul_floor"):
+            infer.load_engine(str(ckpt), device="cpu", noul_floor=bad)
+
+
+def test_noul_floor_from_ask(ckpt, monkeypatch):
+    seen = []
+    original = h2o.load_h2o_engine
+
+    def spy(*args, **kwargs):
+        engine = original(*args, **kwargs)
+        seen.append(engine)
+        return engine
+
+    monkeypatch.setattr(h2o, "load_h2o_engine", spy)
+    assert _ask([str(ckpt), *ASK, "--noul-floor", "0"], monkeypatch).exit_code == 0
+    assert seen[-1].noul_floor() == 0

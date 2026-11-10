@@ -69,6 +69,11 @@ _LLAMA_URL_HELP = (
     "else http://127.0.0.1:8080. A host that is not this machine gets a warning."
 )
 _LLAMA_TIMEOUT_HELP = "Seconds to wait for the llama-server's answer."
+_NOUL_FLOOR_HELP = (
+    "h2o-lightning checkpoints only: the yes/no floor (serve_config.json's noul_floor moves an "
+    "unsure yes/no answer to it). 0 turns it off, as h2o's SHIM_NOUL_FLOOR=0 does; use 0 when a "
+    "yes/no probability is compared with your own threshold. Default: the checkpoint's."
+)
 
 
 def _check_engine(value: str) -> str:
@@ -149,6 +154,7 @@ def serve_cmd(
     llama_server_timeout: float = typer.Option(
         60.0, "--llama-server-timeout", help=_LLAMA_TIMEOUT_HELP
     ),
+    noul_floor: float | None = typer.Option(None, "--noul-floor", help=_NOUL_FLOOR_HELP),
 ) -> None:
     """Serve POST /v1/systemone. JevBench's typesafe adapter runs against it unchanged."""
     from .server import serve
@@ -173,6 +179,7 @@ def serve_cmd(
         engine=engine,
         llama_server_url=llama_server_url,
         llama_server_timeout=llama_server_timeout,
+        noul_floor=noul_floor,
     )
 
 
@@ -209,6 +216,7 @@ def ask_cmd(
     llama_server_timeout: float = typer.Option(
         60.0, "--llama-server-timeout", help=_LLAMA_TIMEOUT_HELP
     ),
+    noul_floor: float | None = typer.Option(None, "--noul-floor", help=_NOUL_FLOOR_HELP),
 ) -> None:
     """Ask one state a set of typed questions from the command line."""
     from .infer import load_engine
@@ -260,6 +268,7 @@ def ask_cmd(
         engine=engine,
         llama_server_url=llama_server_url,
         llama_server_timeout=llama_server_timeout,
+        noul_floor=noul_floor,
     )
     try:
         response = loaded.evaluate(request)

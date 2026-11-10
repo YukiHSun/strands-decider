@@ -439,8 +439,45 @@ class SystemOneEngine:
         return self.evaluate(SystemOneRequest(state=state, questions=questions))
 
 
-@torch.inference_mode()  # type: ignore[untyped-decorator]
 def load_engine(
+    checkpoint: str,
+    *,
+    device: str = "cuda",
+    use_prefix_cache: bool = True,
+    attn_implementation: str | None = None,
+    attention: str | None = None,
+    revision: str | None = None,
+    vision: bool = False,
+    engine: str = "local",
+    llama_server_url: str | None = None,
+    llama_server_timeout: float = 60.0,
+    noul_floor: float | None = None,
+) -> SystemOneEngine | H2OEngine:
+    """`_load_engine` (below), then `noul_floor` on an h2o-lightning engine: the yes/no floor its
+    answers are committed to (None: the checkpoint's; 0: off). Not used for a strands-decider
+    checkpoint, whose yes/no answers have no floor."""
+    from .h2o import H2OEngine, check_noul_floor
+
+    floor = check_noul_floor(noul_floor)
+    loaded = _load_engine(
+        checkpoint,
+        device=device,
+        use_prefix_cache=use_prefix_cache,
+        attn_implementation=attn_implementation,
+        attention=attention,
+        revision=revision,
+        vision=vision,
+        engine=engine,
+        llama_server_url=llama_server_url,
+        llama_server_timeout=llama_server_timeout,
+    )
+    if isinstance(loaded, H2OEngine) and floor is not None:
+        loaded.cfg.noul_floor = floor
+    return loaded
+
+
+@torch.inference_mode()  # type: ignore[untyped-decorator]
+def _load_engine(
     checkpoint: str,
     *,
     device: str = "cuda",

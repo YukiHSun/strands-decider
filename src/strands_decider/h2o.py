@@ -615,6 +615,15 @@ def probabilities(log_probs: Sequence[float], temperature: float) -> list[float]
     return [x / s for x in e]
 
 
+def check_noul_floor(value: float | None) -> float | None:
+    """`--noul-floor`: None (the checkpoint's), 0 (off) or a floor in [0.5, 1)."""
+    if value is None or value == 0:
+        return value
+    if not 0.5 <= value < 1.0:
+        raise ValueError(f"noul_floor must be 0 (off) or in [0.5, 1), got {value!r}")
+    return float(value)
+
+
 def commit_noul(p_true: float, floor: float) -> float:
     """A yes/no probability with max(P, 1 - P) under `floor` moves to the floor on its own side
     (a tie goes to true). The answer never changes; a floor of 0 turns this off."""
@@ -765,6 +774,9 @@ class H2OEngineConfig:
     model_name: str = "h2o-lightning"
     # Not used by this engine (no state is cached); kept so /health reports the same keys.
     use_prefix_cache: bool = False
+    # Overrides serve_config.json's yes/no floor when set; 0 turns the floor off, as h2o's own
+    # SHIM_NOUL_FLOOR=0 does. None: the checkpoint's floor.
+    noul_floor: float | None = None
 
 
 class H2OEngine:
@@ -827,6 +839,13 @@ class H2OEngine:
         self.max_length = max_length
         # A fast tokenizer is not safe to call from two threads at once (see SystemOneEngine).
         self._tok_lock = threading.Lock()
+
+    def noul_floor(self) -> float:
+        """The yes/no floor answers are committed to: `--noul-floor` when given, else the
+        checkpoint's (serve_config.json) for the reading served."""
+        if self.cfg.noul_floor is not None:
+            return self.cfg.noul_floor
+        return self.serve_config.floor(self.attention)
 
     def health_fields(self) -> dict[str, Any]:
         """/health's model fields: the base model, the prompt window and the per-type
@@ -925,7 +944,7 @@ class H2OEngine:
             rendered = {n: expand_rendered(r, tokens_per_image) for n, r in rendered.items()}
         prompts = {name: self.tokenize(r) for name, r in rendered.items()}
         temperatures = self.serve_config.request_temperatures(self.attention, images is not None)
-        floor = self.serve_config.floor(self.attention)
+        floor = self.noul_floor()
         # A backend that reads the label logits itself (a llama-server) is given the prompt.
         reads_logits: Any = getattr(self.backend, "label_logits", None)
         answers: dict[str, Answer] = {}
