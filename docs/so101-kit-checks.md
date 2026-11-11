@@ -21,7 +21,7 @@ reference.
 |---|---|---|---|---|---|---|---|
 | [h2oai/h2o-lightning-4b](https://huggingface.co/h2oai/h2o-lightning-4b) v1.2.3, 4B | this branch (`--attention one-way --noul-floor 0`) | 15 / 15 | 15 / 15 | 0 | 7 / 7 | 83.8% (v1.4.2) | 1.1 s |
 | [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash), 9B | this branch ([docs/clef.md](clef.md)) | 13 / 15 | 12 / 15 | 1 | 7 / 7 | not run | 1.8 s |
-| [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b) (`585473d`), 4B | its own server, [Mapika/decider](https://github.com/Mapika/decider) | 14 / 15 | 13 / 15 | 0 | 7 / 7 | 64.6% | 1.4 s |
+| [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b) (`585473d`), 4B | this branch ([docs/mapika-decider.md](mapika-decider.md)); first run on its own server, [Mapika/decider](https://github.com/Mapika/decider) | 14 / 15 | 13 / 15 | 0 | 7 / 7 | 64.6% (its own server) | 1.1 s (1.4 s on its own) |
 | [jaredpalmer/kev-4b](https://huggingface.co/jaredpalmer/kev-4b) (`6cfce5c`), 4B | its own server, [jaredpalmer/kev](https://github.com/jaredpalmer/kev) (MLX) | 7 / 15 | 7 / 15 | 1 | 7 / 7 | no images | 0.8 s |
 | Jev 1.14 (hosted) | TypeSafe API | 15 / 15 | 15 / 15 | 0 | 7 / 7 | 84.6% | 0.15 s |
 
@@ -35,7 +35,9 @@ Notes:
 - **decider-4b** reads its yes/no answers at temperature 0.05 (its `decider_config.json`), so the
   safety probabilities are 1.00 or 0.00: every failure stopped here, but a wrong yes would be
   just as certain. As an eye it often said the cube was not visible. It answers no `box`
-  questions, so those were left out of its eye check. Not added to this branch.
+  questions, so those were left out of its eye check. This branch serves it as text only; on the
+  kit it gave the same skill and the same pass/stop verdict as the release's server on 19 of 19
+  ([docs/mapika-decider.md](mapika-decider.md)).
 - **kev-4b** is the fastest, but half of the successful steps fell under the confidence gate,
   and after the lift it chose `transfer` (confidence 0.53) instead of `secure_grasp`, which
   passed. Not added to this branch.
@@ -55,7 +57,7 @@ command serves every model below (`--device cuda`, `mps` or `cpu`; `mlx` where n
 | strands-decider (upstream), e.g. `StrandsAgents/strands-decider-2B-qwen3.5-v1-2610` | `strands-decider serve StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 --device mps` | also the gemma4 E2B / E4B / 12B / 26B-A4B builds; `--vision` for images; `--device mlx` on Apple silicon |
 | h2oai/h2o-lightning-4b | `strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps` | `--noul-floor 0` keeps raw yes/no probabilities; `--vision` for images; MLX and GGUF builds too ([docs/h2o-lightning.md](h2o-lightning.md)) |
 | Cloudflare/clef-flash | `strands-decider serve Cloudflare/clef-flash --device cuda` | `--device mps` on a 32 GB+ Mac; images always on ([docs/clef.md](clef.md)) |
-| Mapika/decider-4b | **not yet**: its own server (below) | support in this branch is in progress |
+| Mapika/decider-4b | `strands-decider serve Mapika/decider-4b --device mps` | text only (images: its own server, below); yes/no answers at its own temperature 0.05 ([docs/mapika-decider.md](mapika-decider.md)) |
 | jaredpalmer/kev-4b | **not yet**: its own server (below) | support in this branch is planned after decider-4b |
 
 `strands-decider ask <model> --state "..." --noul "..."` answers one question from the command
@@ -78,6 +80,10 @@ strands-decider serve Cloudflare/clef-flash --revision fb4417d31c1d0f9e7e77f1141
 ```
 
 ### Mapika/decider-4b (its own server)
+
+This branch serves it too (`strands-decider serve Mapika/decider-4b`, text only); its own server is
+needed for images and was the reference for this branch's engine.
+
 
 Revision `585473dec4fa93f0325c2bf02dda7273b61f44c1` (the server reports `decider-4b-v2.1`), about
 9 GB with the vision tower.

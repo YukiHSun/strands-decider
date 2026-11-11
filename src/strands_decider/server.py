@@ -23,6 +23,8 @@ from .clef import ClefEngine, load_clef_engine
 from .clef import resolve as resolve_clef
 from .h2o import H2OEngine, H2OEngineConfig, load_h2o_engine, resolve
 from .infer import EngineConfig, SystemOneEngine, load_mlx
+from .mapika import MapikaEngine, load_mapika_engine
+from .mapika import resolve as resolve_mapika
 from .modeling import StrandsDeciderModel, checkpoint_dir
 from .schema import (
     ChoiceQuestion,
@@ -42,7 +44,9 @@ def _needs_serialisation(device: str) -> bool:
 
 
 def warm_up(
-    engine: SystemOneEngine | H2OEngine | ClefEngine, max_batch: int, vision: bool = False
+    engine: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine,
+    max_batch: int,
+    vision: bool = False,
 ) -> None:
     """Ask every question kind, then every number of questions up to `max_batch`, once.
 
@@ -70,7 +74,7 @@ def warm_up(
 
 
 def _warm_up_image(
-    engine: SystemOneEngine | H2OEngine | ClefEngine, state: str, question: Question
+    engine: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine, state: str, question: Question
 ) -> None:
     """One image request: the first one initialises the image path; after it, image requests
     reuse the text path's kernels, whatever the number of questions or images. The image is
@@ -122,7 +126,8 @@ def create_app(
     max_batch_tokens: int | None = None,
     device_map: str | None = None,
     warmup: bool = True,
-    build_engine: Callable[[], SystemOneEngine | H2OEngine | ClefEngine] | None = None,
+    build_engine: Callable[[], SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine]
+    | None = None,
     max_concurrency: int | None = None,
     attention: str | None = None,
     revision: str | None = None,
@@ -170,7 +175,7 @@ def create_app(
         max_batch_tokens=max_batch_tokens,
     )
 
-    def _default_build_engine() -> SystemOneEngine | H2OEngine | ClefEngine:
+    def _default_build_engine() -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine:
         if engine == "llama-server":
             llama = load_engine(
                 checkpoint,
@@ -204,6 +209,19 @@ def create_app(
                 )
             return load_clef_engine(
                 clef_path,
+                device=device,
+                model_name=resolved_name,
+                attn_implementation=attn_implementation,
+            )
+        mapika_path = resolve_mapika(checkpoint, revision)
+        if mapika_path is not None:
+            if device == "mlx" or device_map or vision:
+                raise ValueError(
+                    "a Mapika decider checkpoint runs on one torch device (cuda, mps or cpu), "
+                    "text only: --device mlx, --device-map and --vision are not supported for it"
+                )
+            return load_mapika_engine(
+                mapika_path,
                 device=device,
                 model_name=resolved_name,
                 attn_implementation=attn_implementation,
@@ -243,7 +261,7 @@ def create_app(
                 if engine_name != "llama-server":
                     # A Clef engine answers a request in one forward of one record, whatever
                     # its number of questions: the three kinds suffice there too.
-                    one = isinstance(engine, H2OEngine | ClefEngine)
+                    one = isinstance(engine, H2OEngine | ClefEngine | MapikaEngine)
                     warm_up(engine, 1 if one else max_batch, vision=vision)
             yield
         finally:
@@ -280,7 +298,7 @@ def create_app(
     async def health(eng: Any = Depends(get_engine)) -> dict:
         fields = (
             eng.health_fields()
-            if isinstance(eng, H2OEngine | ClefEngine)
+            if isinstance(eng, H2OEngine | ClefEngine | MapikaEngine)
             else {
                 "base_model": eng.model.config.base_model,
                 "max_length": eng.model.config.max_length,
@@ -298,7 +316,7 @@ def create_app(
         }
 
     def evaluate(
-        eng: SystemOneEngine | H2OEngine | ClefEngine, request: SystemOneRequest
+        eng: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine, request: SystemOneRequest
     ) -> SystemOneResponse:
         with guard:
             return eng.evaluate(request)

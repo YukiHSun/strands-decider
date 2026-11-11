@@ -56,6 +56,7 @@ from .schema import (
 if TYPE_CHECKING:
     from .clef import ClefEngine
     from .h2o import H2OEngine
+    from .mapika import MapikaEngine
 
 
 @dataclass
@@ -454,7 +455,7 @@ def load_engine(
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
     noul_floor: float | None = None,
-) -> SystemOneEngine | H2OEngine | ClefEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine:
     """`_load_engine` (below), then `noul_floor` on an h2o-lightning engine: the yes/no floor its
     answers are committed to (None: the checkpoint's; 0: off). Not used for a strands-decider
     checkpoint, whose yes/no answers have no floor."""
@@ -491,7 +492,7 @@ def _load_engine(
     engine: str = "local",
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
-) -> SystemOneEngine | H2OEngine | ClefEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine:
     """An engine on a torch device ("cuda", "mps", "cpu"), or on MLX with `device="mlx"`.
 
     An h2o-lightning checkpoint (`serve_config.json` and no decider config, see h2o.py) gives an
@@ -557,6 +558,21 @@ def _load_engine(
             raise ValueError("a Clef checkpoint runs on torch devices (cuda, mps, cpu), not mlx")
         return load_clef_engine(
             clef_path,
+            device=device,
+            model_name=os.path.basename(checkpoint.rstrip("/")) or checkpoint,
+            attn_implementation=attn_implementation,
+        )
+    from .mapika import load_mapika_engine
+    from .mapika import resolve as resolve_mapika
+
+    mapika_path = resolve_mapika(checkpoint, revision)
+    if mapika_path is not None:
+        if device == "mlx" or vision:
+            raise ValueError(
+                "a Mapika decider checkpoint runs on torch devices (cuda, mps, cpu), text only"
+            )
+        return load_mapika_engine(
+            mapika_path,
             device=device,
             model_name=os.path.basename(checkpoint.rstrip("/")) or checkpoint,
             attn_implementation=attn_implementation,
