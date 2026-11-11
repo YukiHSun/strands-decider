@@ -44,3 +44,71 @@ Notes:
 
 The per-request results are in the kit's `outputs/` folder (`decider_*_vs_jev_comparison.json`,
 `prompt_order_comparison_strict_anchored_*.json`, `eye_eval_*.json`).
+
+## Reproducing
+
+Each model runs as a local `POST /v1/systemone` server; the kit's scripts are then pointed at it
+with `DECIDER_URL`. The kit compares against hosted Jev, so its `.env` needs `TYPESAFE_API_KEY`.
+
+### The two models this branch serves
+
+```bash
+# h2o-lightning-4b v1.2.3, raw yes/no probabilities
+strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps --port 8766
+
+# clef-flash, revision fb4417d31c1d0f9e7e77f1141b40aaede7491e00 (bf16, about 19 GB)
+strands-decider serve Cloudflare/clef-flash --revision fb4417d31c1d0f9e7e77f1141b40aaede7491e00 --device mps --port 8742
+```
+
+### Mapika/decider-4b (its own server)
+
+Revision `585473dec4fa93f0325c2bf02dda7273b61f44c1` (the server reports `decider-4b-v2.1`), about
+9 GB with the vision tower.
+
+```bash
+git clone https://github.com/Mapika/decider && cd decider
+uv venv -p 3.12 venv && VIRTUAL_ENV=$PWD/venv uv pip install ".[serve]" torchvision   # torchvision: the image processor needs it
+huggingface-cli download Mapika/decider-4b --revision 585473dec4fa93f0325c2bf02dda7273b61f44c1 --local-dir ~/models/decider-4b
+DECIDER_MODEL=~/models/decider-4b DECIDER_DEVICE=mps DECIDER_IMAGES=1 venv/bin/uvicorn decider.serve:app --host 127.0.0.1 --port 8743
+```
+
+`DECIDER_IMAGES=1` turns image input on (the kit's eye check). `/health` reports the per-type
+temperatures, including the yes/no temperature of 0.05.
+
+### jaredpalmer/kev-4b (its own server)
+
+Revision `6cfce5c2fa4b4bd64026336ab649c5ca78857d52`, a LoRA adapter and head on
+`Qwen/Qwen3.5-4B-Base` (revision `1001bb4d`, about 9 GB), which the server fetches from the Hub.
+
+```bash
+git clone https://github.com/jaredpalmer/kev && cd kev
+uv sync --extra serve        # pins torch < 2.9; on Apple silicon it runs through MLX
+python -m kev.serve --run jaredpalmer/kev-4b@6cfce5c2fa4b4bd64026336ab649c5ca78857d52 --host 127.0.0.1 --port 8744 --device mps
+```
+
+The kev server has no `/health`; it is ready when it prints `serving jaredpalmer/kev-4b@...`.
+
+### The kit's checks
+
+From the root of [pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider),
+for each server (the port and an output name per model):
+
+```bash
+DECIDER_URL=http://127.0.0.1:8742 .venv/bin/python compare_decider_vs_jev.py decider_clef_flash_vs_jev_comparison.json
+DECIDER_URL=http://127.0.0.1:8742 .venv/bin/python compare_prompt_order.py strict_anchored clef_flash
+# eye check (image models; the server must take images)
+H2O_URL=http://127.0.0.1:8743/v1/systemone H2O_TAG=mapika-decider-4b .venv/bin/python eval_eye_models.py h2o
+```
+
+### Pitfalls met on the way
+
+- **A stalled Hub download.** `huggingface_hub`'s Xet transfer stopped at 0 KB/s twice here;
+  `HF_HUB_DISABLE_XET=1` (plain HTTP) downloaded at about 15 MB/s.
+- **The eye check and `box`.** `eval_eye_models.py h2o` also asks `box` questions; decider-4b
+  answers none, so they were dropped from the request for it (a wrapper around the script's
+  `post`, the kit unchanged).
+- **A skill of the other task.** `compare_prompt_order.py` stops when a model returns a skill the
+  task does not have; this happened with the revised wording for clef-flash and decider-4b. That
+  one request was counted as a wrong, stopped answer (a wrapper around the script's `ask`).
+- **torchvision.** Clef's and decider-4b's own processors load a video processor that needs
+  torchvision. This branch's Clef engine uses the PIL image processor instead and does not need it.
