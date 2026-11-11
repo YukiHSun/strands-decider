@@ -24,10 +24,11 @@
 <hr>
 
 > [!NOTE]
-> **This fork branch (`feat/clef-flash`) adds three decision models from other vendors, on top of current upstream `main`:**
+> **This fork branch (`feat/clef-flash`) adds four decision models from other vendors, on top of current upstream `main`:**
 > [h2oai/h2o-lightning-4b](https://huggingface.co/h2oai/h2o-lightning-4b),
-> [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash) and
-> [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b).
+> [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash),
+> [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b) and
+> [jaredpalmer/kev-4b](https://huggingface.co/jaredpalmer/kev-4b).
 > `strands-decider ask` and `strands-decider serve` load each the same way as a strands-decider
 > checkpoint, behind the same `POST /v1/systemone` API and with the same answer shape.
 >
@@ -35,6 +36,7 @@
 > strands-decider serve Cloudflare/clef-flash --device cuda        # or --device mps
 > strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps
 > strands-decider serve Mapika/decider-4b --device mps          # text only
+> strands-decider serve jaredpalmer/kev-4b --device mps         # text only
 > ```
 >
 > | Model | Served by | What this branch adds | Usage | SO-101 kit: successful steps passed | Wrong skill passed |
@@ -42,7 +44,7 @@
 > | h2o-lightning-4b (4B) | **this branch** | torch, MLX, images, or a llama-server running its GGUF build; `--noul-floor 0` keeps raw yes/no probabilities | [docs/h2o-lightning.md](docs/h2o-lightning.md) | 15 / 15 | 0 |
 > | clef-flash (9B, Apache-2.0) | **this branch** | torch (`cuda`, `mps`, `cpu`), images; answers match the release's reference implementation exactly | [docs/clef.md](docs/clef.md) | 13 / 15 | 1 |
 > | Mapika/decider-4b (4B) | **this branch** | torch (`cuda`, `mps`, `cpu`), text only; same skill and verdict as the release's own server on 19 of 19 kit requests | [docs/mapika-decider.md](docs/mapika-decider.md) | 14 / 15 | 0 |
-> | jaredpalmer/kev-4b (4B) | its own server (not added) | — | [how it was run](docs/so101-kit-checks.md#jaredpalmerkev-4b-its-own-server) | 7 / 15 | 1 |
+> | jaredpalmer/kev-4b (4B) | **this branch** | torch (`cuda`, `mps`, `cpu`), text only; LoRA merged into its base at load; same skill as the release's own server on 19 of 19 kit requests | [docs/kev.md](docs/kev.md) | 7 / 15 | 1 |
 > | Jev 1.14 (reference) | hosted TypeSafe API | — | — | 15 / 15 | 0 |
 >
 > All five stopped the kit's 7 deliberately failed observations. Details and the remaining columns
@@ -54,18 +56,18 @@
 >   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b),
 >   merged onto current `main` in
 >   [`feat/h2o-lightning-4b-on-main`](https://github.com/YukiHSun/strands-decider/tree/feat/h2o-lightning-4b-on-main),
->   which adds `--noul-floor` ([details](#this-fork-h2o-lightning-4b-clef-flash-and-decider-4b-on-current-main)). The
->   Clef and decider-4b support is new in this branch.
-> - All three were checked with an SO-101 robot-arm pick-and-place kit,
+>   which adds `--noul-floor` ([details](#this-fork-h2o-lightning-4b-clef-flash-decider-4b-and-kev-4b-on-current-main)). The
+>   Clef, decider-4b and kev-4b support is new in this branch.
+> - All four were checked with an SO-101 robot-arm pick-and-place kit,
 >   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
 >   15 successful steps of a recorded run must pass every gate, and 7 deliberately failed
->   observations must stop; all three stopped all 7. On its 19 recorded decisions this
+>   observations must stop; all four stopped all 7. On its 19 recorded decisions this
 >   branch's h2o-lightning also chose the same skill as h2o's own serving on 19 of 19
 >   (section 10.6 of the kit's report; Clef: [docs/clef.md](docs/clef.md); decider-4b:
->   [docs/mapika-decider.md](docs/mapika-decider.md)).
+>   [docs/mapika-decider.md](docs/mapika-decider.md); kev-4b: [docs/kev.md](docs/kev.md)).
 > - decider-4b reads its yes/no answers at its own temperature of 0.05, so its safety
->   probabilities are 1.00 or 0.00. jaredpalmer/kev-4b, run on its own server, fell under the
->   confidence gate on half of the steps; its support here is in progress. All five side by side,
+>   probabilities are 1.00 or 0.00. kev-4b fell under the confidence gate on half of the steps
+>   and let one wrong skill through. All five side by side,
 >   with how each was run (commands, revisions, pitfalls):
 >   [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
@@ -220,7 +222,7 @@ curl -s localhost:8000/v1/systemone \
 
 `ask` and `serve` also read `h2oai/h2o-lightning-4b` checkpoints ([docs/h2o-lightning.md](docs/h2o-lightning.md)).
 
-#### This fork: h2o-lightning-4b, clef-flash and decider-4b on current main
+#### This fork: h2o-lightning-4b, clef-flash, decider-4b and kev-4b on current main
 
 The h2o-lightning-4b support was written by
 [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b)
@@ -248,8 +250,12 @@ rendering and readout of the release's own server (Apache-2.0); it serves text o
 kit it chose the same skill and gave the same pass/stop verdict as the release's server on 19 of
 19 requests. Usage and the check: [docs/mapika-decider.md](docs/mapika-decider.md).
 
-jaredpalmer/kev-4b was run on the same kit checks with its author's own server; its support in
-this branch is in progress. The five models side by side, with the commands, revisions and
+The jaredpalmer/kev-4b support is new in this branch as well. `src/strands_decider/kev.py` ports
+the release's rendering, packing and pointer-head readout (Apache-2.0) and merges its LoRA into
+the base at load; it serves text only. On the SO-101 kit it chose the same skill as the release's
+server on 19 of 19 requests. Usage and the check: [docs/kev.md](docs/kev.md).
+
+The five models side by side (these four and hosted Jev), with the commands, revisions and
 pitfalls to repeat each run: [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
 ### Images

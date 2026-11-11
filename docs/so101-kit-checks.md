@@ -22,7 +22,7 @@ reference.
 | [h2oai/h2o-lightning-4b](https://huggingface.co/h2oai/h2o-lightning-4b) v1.2.3, 4B | this branch (`--attention one-way --noul-floor 0`) | 15 / 15 | 15 / 15 | 0 | 7 / 7 | 83.8% (v1.4.2) | 1.1 s |
 | [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash), 9B | this branch ([docs/clef.md](clef.md)) | 13 / 15 | 12 / 15 | 1 | 7 / 7 | not run | 1.8 s |
 | [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b) (`585473d`), 4B | this branch ([docs/mapika-decider.md](mapika-decider.md)); first run on its own server, [Mapika/decider](https://github.com/Mapika/decider) | 14 / 15 | 13 / 15 | 0 | 7 / 7 | 64.6% (its own server) | 1.1 s (1.4 s on its own) |
-| [jaredpalmer/kev-4b](https://huggingface.co/jaredpalmer/kev-4b) (`6cfce5c`), 4B | its own server, [jaredpalmer/kev](https://github.com/jaredpalmer/kev) (MLX) | 7 / 15 | 7 / 15 | 1 | 7 / 7 | no images | 0.8 s |
+| [jaredpalmer/kev-4b](https://huggingface.co/jaredpalmer/kev-4b) (`6cfce5c`), 4B | this branch ([docs/kev.md](kev.md)); first run on its own server, [jaredpalmer/kev](https://github.com/jaredpalmer/kev) (MLX) | 7 / 15 | 7 / 15 | 1 | 7 / 7 | no images | 1.2 s (0.8 s on its own, MLX) |
 | Jev 1.14 (hosted) | TypeSafe API | 15 / 15 | 15 / 15 | 0 | 7 / 7 | 84.6% | 0.15 s |
 
 Notes:
@@ -40,7 +40,8 @@ Notes:
   ([docs/mapika-decider.md](mapika-decider.md)).
 - **kev-4b** is the fastest, but half of the successful steps fell under the confidence gate,
   and after the lift it chose `transfer` (confidence 0.53) instead of `secure_grasp`, which
-  passed. Not added to this branch.
+  passed. This branch serves it too; on the kit it gave the same skill as the release's server on
+  19 of 19 ([docs/kev.md](kev.md)).
 - With the revised wording, clef-flash and decider-4b both picked `secure_grasp`, a skill of the
   other task, right after the cube-lift task's lift; the kit's wording may need another fix there.
 
@@ -58,7 +59,7 @@ command serves every model below (`--device cuda`, `mps` or `cpu`; `mlx` where n
 | h2oai/h2o-lightning-4b | `strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps` | `--noul-floor 0` keeps raw yes/no probabilities; `--vision` for images; MLX and GGUF builds too ([docs/h2o-lightning.md](h2o-lightning.md)) |
 | Cloudflare/clef-flash | `strands-decider serve Cloudflare/clef-flash --device cuda` | `--device mps` on a 32 GB+ Mac; images always on ([docs/clef.md](clef.md)) |
 | Mapika/decider-4b | `strands-decider serve Mapika/decider-4b --device mps` | text only (images: its own server, below); yes/no answers at its own temperature 0.05 ([docs/mapika-decider.md](mapika-decider.md)) |
-| jaredpalmer/kev-4b | **not yet**: its own server (below) | support in this branch is planned after decider-4b |
+| jaredpalmer/kev-4b | `strands-decider serve jaredpalmer/kev-4b --device mps` | text only; the base `Qwen/Qwen3.5-4B-Base` is downloaded and the LoRA merged at load ([docs/kev.md](kev.md)) |
 
 `strands-decider ask <model> --state "..." --noul "..."` answers one question from the command
 line with the same loading rules. Point the kit at any of these servers with
@@ -99,6 +100,10 @@ DECIDER_MODEL=~/models/decider-4b DECIDER_DEVICE=mps DECIDER_IMAGES=1 venv/bin/u
 temperatures, including the yes/no temperature of 0.05.
 
 ### jaredpalmer/kev-4b (its own server)
+
+This branch serves it too (`strands-decider serve jaredpalmer/kev-4b`); its own server (MLX on a
+Mac, or `KEV_BACKEND=torch`) was the reference for this branch's engine.
+
 
 Revision `6cfce5c2fa4b4bd64026336ab649c5ca78857d52`, a LoRA adapter and head on
 `Qwen/Qwen3.5-4B-Base` (revision `1001bb4d`, about 9 GB), which the server fetches from the Hub.

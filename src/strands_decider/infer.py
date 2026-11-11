@@ -56,6 +56,7 @@ from .schema import (
 if TYPE_CHECKING:
     from .clef import ClefEngine
     from .h2o import H2OEngine
+    from .kev import KevEngine
     from .mapika import MapikaEngine
 
 
@@ -455,7 +456,7 @@ def load_engine(
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
     noul_floor: float | None = None,
-) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine:
     """`_load_engine` (below), then `noul_floor` on an h2o-lightning engine: the yes/no floor its
     answers are committed to (None: the checkpoint's; 0: off). Not used for a strands-decider
     checkpoint, whose yes/no answers have no floor."""
@@ -492,7 +493,7 @@ def _load_engine(
     engine: str = "local",
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
-) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine:
     """An engine on a torch device ("cuda", "mps", "cpu"), or on MLX with `device="mlx"`.
 
     An h2o-lightning checkpoint (`serve_config.json` and no decider config, see h2o.py) gives an
@@ -573,6 +574,19 @@ def _load_engine(
             )
         return load_mapika_engine(
             mapika_path,
+            device=device,
+            model_name=os.path.basename(checkpoint.rstrip("/")) or checkpoint,
+            attn_implementation=attn_implementation,
+        )
+    from .kev import load_kev_engine
+    from .kev import resolve as resolve_kev
+
+    kev_path = resolve_kev(checkpoint, revision)
+    if kev_path is not None:
+        if device == "mlx" or vision:
+            raise ValueError("a Kev checkpoint runs on torch devices (cuda, mps, cpu), text only")
+        return load_kev_engine(
+            kev_path,
             device=device,
             model_name=os.path.basename(checkpoint.rstrip("/")) or checkpoint,
             attn_implementation=attn_implementation,
