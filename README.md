@@ -44,7 +44,7 @@
 >   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b),
 >   merged onto current `main` in
 >   [`feat/h2o-lightning-4b-on-main`](https://github.com/YukiHSun/strands-decider/tree/feat/h2o-lightning-4b-on-main),
->   which adds `--noul-floor` ([details](#this-fork-h2o-lightning-4b-on-current-main)). The
+>   which adds `--noul-floor` ([details](#this-fork-h2o-lightning-4b-and-clef-flash-on-current-main)). The
 >   Clef support is new in this branch.
 > - Both were checked with an SO-101 robot-arm pick-and-place kit,
 >   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
@@ -55,8 +55,8 @@
 > - Two more small open models were run on the same checks with their own servers and are
 >   **not** added to this branch: Mapika/decider-4b passed 14 / 15, but its yes/no answers are
 >   read at temperature 0.05, so the safety probabilities are 1.00 or 0.00; jaredpalmer/kev-4b
->   passed 7 / 15 and let one wrong skill through. All five side by side:
->   [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
+>   passed 7 / 15 and let one wrong skill through. All five side by side, with how each was run
+>   (commands, revisions, pitfalls): [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
 Strands decider is one of a new class of **decision models**, or "system one" models. Unlike an
 LLM, which can generate arbitrary text, a decision model picks between sets of options and
@@ -209,7 +209,7 @@ curl -s localhost:8000/v1/systemone \
 
 `ask` and `serve` also read `h2oai/h2o-lightning-4b` checkpoints ([docs/h2o-lightning.md](docs/h2o-lightning.md)).
 
-#### This fork: h2o-lightning-4b on current main
+#### This fork: h2o-lightning-4b and clef-flash on current main
 
 The h2o-lightning-4b support was written by
 [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b)
@@ -225,6 +225,17 @@ sent to `strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attent
 8-bit) on 19 of 19, with the same pass/stop verdict on all 19. The choice confidence differed by
 at most 0.029 and the safety yes/no probability by at most 0.009. All 7 deliberately failed
 observations were stopped.
+
+The clef-flash support is new in this branch (`feat/clef-flash`, on top of
+`feat/h2o-lightning-4b-on-main`). `src/strands_decider/clef.py` ports the release's prompt layout
+and joint schema head from its reference implementation (Apache-2.0); no code from the model repo
+is run. On 27 requests (the kit's 26 and one with an image) its answers were identical to the
+reference `systemone()` on the same weights. Usage and the kit results: [docs/clef.md](docs/clef.md).
+
+Two more small open decision models, Mapika/decider-4b and jaredpalmer/kev-4b, were run on the
+same kit checks with their authors' own servers and are not added to this branch. The five
+models side by side, with the commands, revisions and pitfalls to repeat each run:
+[docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
 ### Images
 
