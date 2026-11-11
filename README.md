@@ -50,6 +50,9 @@
 >   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
 >   19 recorded decisions and 7 deliberately failed observations, all 7 of which both models
 >   stopped (h2o-lightning: section 10.6 of its report; Clef: [docs/clef.md](docs/clef.md)).
+> - The same checks on two more small open models served by their own servers
+>   (Mapika/decider-4b, jaredpalmer/kev-4b), side by side with these two and hosted Jev:
+>   [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
 Strands decider is one of a new class of **decision models**, or "system one" models. Unlike an
 LLM, which can generate arbitrary text, a decision model picks between sets of options and
