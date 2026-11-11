@@ -35,10 +35,10 @@
 > strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps
 > ```
 >
-> | Model | What this branch adds | Usage | SO-101 kit check |
+> | Model | What this branch adds | Usage | SO-101 kit: successful steps passed (Jev 1.14: 15 / 15) |
 > |---|---|---|---|
-> | h2o-lightning-4b (4B) | torch, MLX, images, or a llama-server running its GGUF build; `--noul-floor 0` keeps raw yes/no probabilities | [docs/h2o-lightning.md](docs/h2o-lightning.md) | same skill as h2o's own serving on 19 of 19 recorded decisions |
-> | clef-flash (9B, Apache-2.0) | torch (`cuda`, `mps`, `cpu`), images; answers match the release's reference implementation exactly | [docs/clef.md](docs/clef.md) | 13 of 15 successful steps passed the gates (Jev 1.14: 15 of 15) |
+> | h2o-lightning-4b (4B) | torch, MLX, images, or a llama-server running its GGUF build; `--noul-floor 0` keeps raw yes/no probabilities | [docs/h2o-lightning.md](docs/h2o-lightning.md) | 15 / 15 |
+> | clef-flash (9B, Apache-2.0) | torch (`cuda`, `mps`, `cpu`), images; answers match the release's reference implementation exactly | [docs/clef.md](docs/clef.md) | 13 / 15 |
 >
 > - The h2o-lightning support is by
 >   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b),
@@ -48,10 +48,14 @@
 >   Clef support is new in this branch.
 > - Both were checked with an SO-101 robot-arm pick-and-place kit,
 >   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
->   19 recorded decisions and 7 deliberately failed observations, all 7 of which both models
->   stopped (h2o-lightning: section 10.6 of its report; Clef: [docs/clef.md](docs/clef.md)).
-> - The same checks on two more small open models served by their own servers
->   (Mapika/decider-4b, jaredpalmer/kev-4b), side by side with these two and hosted Jev:
+>   15 successful steps of a recorded run must pass every gate, and 7 deliberately failed
+>   observations must stop; both models stopped all 7. On its 19 recorded decisions this
+>   branch's h2o-lightning also chose the same skill as h2o's own serving on 19 of 19
+>   (section 10.6 of the kit's report; Clef: [docs/clef.md](docs/clef.md)).
+> - Two more small open models were run on the same checks with their own servers and are
+>   **not** added to this branch: Mapika/decider-4b passed 14 / 15, but its yes/no answers are
+>   read at temperature 0.05, so the safety probabilities are 1.00 or 0.00; jaredpalmer/kev-4b
+>   passed 7 / 15 and let one wrong skill through. All five side by side:
 >   [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
 Strands decider is one of a new class of **decision models**, or "system one" models. Unlike an
