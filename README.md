@@ -35,10 +35,16 @@
 > strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps
 > ```
 >
-> | Model | What this branch adds | Usage | SO-101 kit: successful steps passed (Jev 1.14: 15 / 15) |
-> |---|---|---|---|
-> | h2o-lightning-4b (4B) | torch, MLX, images, or a llama-server running its GGUF build; `--noul-floor 0` keeps raw yes/no probabilities | [docs/h2o-lightning.md](docs/h2o-lightning.md) | 15 / 15 |
-> | clef-flash (9B, Apache-2.0) | torch (`cuda`, `mps`, `cpu`), images; answers match the release's reference implementation exactly | [docs/clef.md](docs/clef.md) | 13 / 15 |
+> | Model | Served by | What this branch adds | Usage | SO-101 kit: successful steps passed | Wrong skill passed |
+> |---|---|---|---|---|---|
+> | h2o-lightning-4b (4B) | **this branch** | torch, MLX, images, or a llama-server running its GGUF build; `--noul-floor 0` keeps raw yes/no probabilities | [docs/h2o-lightning.md](docs/h2o-lightning.md) | 15 / 15 | 0 |
+> | clef-flash (9B, Apache-2.0) | **this branch** | torch (`cuda`, `mps`, `cpu`), images; answers match the release's reference implementation exactly | [docs/clef.md](docs/clef.md) | 13 / 15 | 1 |
+> | Mapika/decider-4b (4B) | its own server (not added) | — | [how it was run](docs/so101-kit-checks.md#mapikadecider-4b-its-own-server) | 14 / 15 | 0 |
+> | jaredpalmer/kev-4b (4B) | its own server (not added) | — | [how it was run](docs/so101-kit-checks.md#jaredpalmerkev-4b-its-own-server) | 7 / 15 | 1 |
+> | Jev 1.14 (reference) | hosted TypeSafe API | — | — | 15 / 15 | 0 |
+>
+> All five stopped the kit's 7 deliberately failed observations. Details and the remaining columns
+> (revised wording, eye check, time): [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 >
 > - The h2o-lightning support is by
 >   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b),
@@ -53,10 +59,10 @@
 >   branch's h2o-lightning also chose the same skill as h2o's own serving on 19 of 19
 >   (section 10.6 of the kit's report; Clef: [docs/clef.md](docs/clef.md)).
 > - Two more small open models were run on the same checks with their own servers and are
->   **not** added to this branch: Mapika/decider-4b passed 14 / 15, but its yes/no answers are
->   read at temperature 0.05, so the safety probabilities are 1.00 or 0.00; jaredpalmer/kev-4b
->   passed 7 / 15 and let one wrong skill through. All five side by side, with how each was run
->   (commands, revisions, pitfalls): [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
+>   **not** added to this branch: Mapika/decider-4b's yes/no answers are read at temperature
+>   0.05, so its safety probabilities are 1.00 or 0.00, and jaredpalmer/kev-4b fell under the
+>   confidence gate on half of the steps. All five side by side, with how each was run (commands,
+>   revisions, pitfalls): [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
 Strands decider is one of a new class of **decision models**, or "system one" models. Unlike an
 LLM, which can generate arbitrary text, a decision model picks between sets of options and
