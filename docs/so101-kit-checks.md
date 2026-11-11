@@ -45,6 +45,23 @@ Notes:
 The per-request results are in the kit's `outputs/` folder (`decider_*_vs_jev_comparison.json`,
 `prompt_order_comparison_strict_anchored_*.json`, `eye_eval_*.json`).
 
+## Which models the `strands-decider` command runs
+
+`strands-decider serve` and `strands-decider ask` load a checkpoint by its kind, so the same
+command serves every model below (`--device cuda`, `mps` or `cpu`; `mlx` where noted).
+
+| Model | Command | Notes |
+|---|---|---|
+| strands-decider (upstream), e.g. `StrandsAgents/strands-decider-2B-qwen3.5-v1-2610` | `strands-decider serve StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 --device mps` | also the gemma4 E2B / E4B / 12B / 26B-A4B builds; `--vision` for images; `--device mlx` on Apple silicon |
+| h2oai/h2o-lightning-4b | `strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps` | `--noul-floor 0` keeps raw yes/no probabilities; `--vision` for images; MLX and GGUF builds too ([docs/h2o-lightning.md](h2o-lightning.md)) |
+| Cloudflare/clef-flash | `strands-decider serve Cloudflare/clef-flash --device cuda` | `--device mps` on a 32 GB+ Mac; images always on ([docs/clef.md](clef.md)) |
+| Mapika/decider-4b | **not yet**: its own server (below) | support in this branch is in progress |
+| jaredpalmer/kev-4b | **not yet**: its own server (below) | support in this branch is planned after decider-4b |
+
+`strands-decider ask <model> --state "..." --noul "..."` answers one question from the command
+line with the same loading rules. Point the kit at any of these servers with
+`DECIDER_URL=http://127.0.0.1:<port>`.
+
 ## Reproducing
 
 Each model runs as a local `POST /v1/systemone` server; the kit's scripts are then pointed at it

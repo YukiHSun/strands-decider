@@ -45,6 +45,8 @@
 >
 > All five stopped the kit's 7 deliberately failed observations. Details and the remaining columns
 > (revised wording, eye check, time): [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
+> Which models the `strands-decider` command itself runs, with a command for each:
+> [docs/so101-kit-checks.md#which-models-the-strands-decider-command-runs](docs/so101-kit-checks.md#which-models-the-strands-decider-command-runs).
 >
 > - The h2o-lightning support is by
 >   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b),
