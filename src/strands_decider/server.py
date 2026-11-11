@@ -21,6 +21,8 @@ from fastapi.responses import JSONResponse
 from . import __version__
 from .clef import ClefEngine, load_clef_engine
 from .clef import resolve as resolve_clef
+from .elephant import ElephantEngine, load_elephant_engine
+from .elephant import resolve as resolve_elephant
 from .h2o import H2OEngine, H2OEngineConfig, load_h2o_engine, resolve
 from .infer import EngineConfig, SystemOneEngine, load_mlx
 from .kev import KevEngine, load_kev_engine
@@ -46,7 +48,7 @@ def _needs_serialisation(device: str) -> bool:
 
 
 def warm_up(
-    engine: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine,
+    engine: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine,
     max_batch: int,
     vision: bool = False,
 ) -> None:
@@ -76,7 +78,7 @@ def warm_up(
 
 
 def _warm_up_image(
-    engine: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine,
+    engine: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine,
     state: str,
     question: Question,
 ) -> None:
@@ -130,7 +132,9 @@ def create_app(
     max_batch_tokens: int | None = None,
     device_map: str | None = None,
     warmup: bool = True,
-    build_engine: Callable[[], SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine]
+    build_engine: Callable[
+        [], SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine
+    ]
     | None = None,
     max_concurrency: int | None = None,
     attention: str | None = None,
@@ -180,7 +184,7 @@ def create_app(
     )
 
     def _default_build_engine() -> (
-        SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine
+        SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine
     ):
         if engine == "llama-server":
             llama = load_engine(
@@ -245,6 +249,19 @@ def create_app(
                 model_name=resolved_name,
                 attn_implementation=attn_implementation,
             )
+        elephant_path = resolve_elephant(checkpoint, revision)
+        if elephant_path is not None:
+            if device == "mlx" or device_map or vision:
+                raise ValueError(
+                    "a qev checkpoint (elephant-1) runs on one torch device (cuda, mps or cpu), "
+                    "text only: --device mlx, --device-map and --vision are not supported for it"
+                )
+            return load_elephant_engine(
+                elephant_path,
+                device=device,
+                model_name=resolved_name,
+                attn_implementation=attn_implementation,
+            )
         source = checkpoint if revision is None else checkpoint_dir(checkpoint, revision)
         if vision:
             from .vision import load_vision_engine
@@ -280,7 +297,9 @@ def create_app(
                 if engine_name != "llama-server":
                     # A Clef engine answers a request in one forward of one record, whatever
                     # its number of questions: the three kinds suffice there too.
-                    one = isinstance(engine, H2OEngine | ClefEngine | MapikaEngine | KevEngine)
+                    one = isinstance(
+                        engine, H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine
+                    )
                     warm_up(engine, 1 if one else max_batch, vision=vision)
             yield
         finally:
@@ -317,7 +336,7 @@ def create_app(
     async def health(eng: Any = Depends(get_engine)) -> dict:
         fields = (
             eng.health_fields()
-            if isinstance(eng, H2OEngine | ClefEngine | MapikaEngine | KevEngine)
+            if isinstance(eng, H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine)
             else {
                 "base_model": eng.model.config.base_model,
                 "max_length": eng.model.config.max_length,
@@ -335,7 +354,7 @@ def create_app(
         }
 
     def evaluate(
-        eng: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine,
+        eng: SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine,
         request: SystemOneRequest,
     ) -> SystemOneResponse:
         with guard:

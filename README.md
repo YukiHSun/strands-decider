@@ -24,11 +24,12 @@
 <hr>
 
 > [!NOTE]
-> **This fork branch (`feat/clef-flash`) adds four decision models from other vendors, on top of current upstream `main`:**
+> **This fork branch (`feat/clef-flash`) adds five decision models from other vendors, on top of current upstream `main`:**
 > [h2oai/h2o-lightning-4b](https://huggingface.co/h2oai/h2o-lightning-4b),
 > [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash),
-> [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b) and
-> [jaredpalmer/kev-4b](https://huggingface.co/jaredpalmer/kev-4b).
+> [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b),
+> [jaredpalmer/kev-4b](https://huggingface.co/jaredpalmer/kev-4b) and
+> [baselabs/elephant-1](https://huggingface.co/baselabs/elephant-1).
 > `strands-decider ask` and `strands-decider serve` load each the same way as a strands-decider
 > checkpoint, behind the same `POST /v1/systemone` API and with the same answer shape.
 >
@@ -37,6 +38,15 @@
 > strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps
 > strands-decider serve Mapika/decider-4b --device mps          # text only
 > strands-decider serve jaredpalmer/kev-4b --device mps         # text only
+> strands-decider serve baselabs/elephant-1 --device mps        # text only; 9B, a 32 GB+ Mac or a 24 GB GPU
+> ```
+>
+> Every one of them then answers on the same endpoint
+> ([how to run them](#running-the-other-vendors-models-with-strands-decider-serve)):
+>
+> ```bash
+> curl -s http://127.0.0.1:8000/v1/systemone -H 'content-type: application/json' \
+>   -d '{"state": "The door is open.", "questions": {"open": {"type": "noul", "instructions": "Is the door open?"}}}'
 > ```
 >
 > | Model | Served by | What this branch adds | Usage | SO-101 kit: successful steps passed | Wrong skill passed |
@@ -45,9 +55,10 @@
 > | clef-flash (9B, Apache-2.0) | **this branch** | torch (`cuda`, `mps`, `cpu`), images; answers match the release's reference implementation exactly | [docs/clef.md](docs/clef.md) | 13 / 15 | 1 |
 > | Mapika/decider-4b (4B) | **this branch** | torch (`cuda`, `mps`, `cpu`), text only; same skill and verdict as the release's own server on 19 of 19 kit requests | [docs/mapika-decider.md](docs/mapika-decider.md) | 14 / 15 | 0 |
 > | jaredpalmer/kev-4b (4B) | **this branch** | torch (`cuda`, `mps`, `cpu`), text only; LoRA merged into its base at load; same skill as the release's own server on 19 of 19 kit requests | [docs/kev.md](docs/kev.md) | 7 / 15 | 1 |
+> | baselabs/elephant-1 (9B, MIT) | **this branch** | torch (`cuda`, `mps`, `cpu`), text only; block attention read from its `config.json`; same skill and verdict as the release's own runtime on 19 of 19 kit requests | [docs/elephant.md](docs/elephant.md) | 15 / 15 | 0 |
 > | Jev 1.14 (reference) | hosted TypeSafe API | — | — | 15 / 15 | 0 |
 >
-> All five stopped the kit's 7 deliberately failed observations. Details and the remaining columns
+> All six stopped the kit's 7 deliberately failed observations. Details and the remaining columns
 > (revised wording, eye check, time): [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 > Which models the `strands-decider` command itself runs, with a command for each:
 > [docs/so101-kit-checks.md#which-models-the-strands-decider-command-runs](docs/so101-kit-checks.md#which-models-the-strands-decider-command-runs).
@@ -56,18 +67,19 @@
 >   [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b),
 >   merged onto current `main` in
 >   [`feat/h2o-lightning-4b-on-main`](https://github.com/YukiHSun/strands-decider/tree/feat/h2o-lightning-4b-on-main),
->   which adds `--noul-floor` ([details](#this-fork-h2o-lightning-4b-clef-flash-decider-4b-and-kev-4b-on-current-main)). The
->   Clef, decider-4b and kev-4b support is new in this branch.
-> - All four were checked with an SO-101 robot-arm pick-and-place kit,
+>   which adds `--noul-floor` ([details](#this-fork-h2o-lightning-4b-clef-flash-decider-4b-kev-4b-and-elephant-1-on-current-main)). The
+>   Clef, decider-4b, kev-4b and elephant-1 support is new in this branch.
+> - All five were checked with an SO-101 robot-arm pick-and-place kit,
 >   [YukiHSun/pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider):
 >   15 successful steps of a recorded run must pass every gate, and 7 deliberately failed
->   observations must stop; all four stopped all 7. On its 19 recorded decisions this
+>   observations must stop; all five stopped all 7. On its 19 recorded decisions this
 >   branch's h2o-lightning also chose the same skill as h2o's own serving on 19 of 19
 >   (section 10.6 of the kit's report; Clef: [docs/clef.md](docs/clef.md); decider-4b:
->   [docs/mapika-decider.md](docs/mapika-decider.md); kev-4b: [docs/kev.md](docs/kev.md)).
+>   [docs/mapika-decider.md](docs/mapika-decider.md); kev-4b: [docs/kev.md](docs/kev.md);
+>   elephant-1: [docs/elephant.md](docs/elephant.md)).
 > - decider-4b reads its yes/no answers at its own temperature of 0.05, so its safety
 >   probabilities are 1.00 or 0.00. kev-4b fell under the confidence gate on half of the steps
->   and let one wrong skill through. All five side by side,
+>   and let one wrong skill through. elephant-1 matched hosted Jev on every count. All six side by side,
 >   with how each was run (commands, revisions, pitfalls):
 >   [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
 
@@ -222,7 +234,7 @@ curl -s localhost:8000/v1/systemone \
 
 `ask` and `serve` also read `h2oai/h2o-lightning-4b` checkpoints ([docs/h2o-lightning.md](docs/h2o-lightning.md)).
 
-#### This fork: h2o-lightning-4b, clef-flash, decider-4b and kev-4b on current main
+#### This fork: h2o-lightning-4b, clef-flash, decider-4b, kev-4b and elephant-1 on current main
 
 The h2o-lightning-4b support was written by
 [yutamorrow](https://github.com/yutamorrow/strands-decider/tree/feat/h2o-lightning-4b)
@@ -255,8 +267,61 @@ the release's rendering, packing and pointer-head readout (Apache-2.0) and merge
 the base at load; it serves text only. On the SO-101 kit it chose the same skill as the release's
 server on 19 of 19 requests. Usage and the check: [docs/kev.md](docs/kev.md).
 
-The five models side by side (these four and hosted Jev), with the commands, revisions and
+The baselabs/elephant-1 support is new in this branch as well. `src/strands_decider/elephant.py`
+ports the prompt rendering, block attention and readout of the runtime the release names (OneJev
+`qev` with the release's `serve.patch`, Apache-2.0); it serves text only. The release's runtime
+needs a CUDA GPU, so it was run on a Colab L4 as the reference: 67 of 67 answers chose the same
+option (largest probability difference 0.026), and on the SO-101 kit it gave the same skill and
+verdict on 19 of 19 requests. Usage and the check: [docs/elephant.md](docs/elephant.md).
+
+The six models side by side (these five and hosted Jev), with the commands, revisions and
 pitfalls to repeat each run: [docs/so101-kit-checks.md](docs/so101-kit-checks.md).
+
+#### Running the other vendors' models with `strands-decider serve`
+
+`strands-decider serve` recognises each checkpoint by its files and loads the matching engine, so
+the same command and the same API serve all of them. The first start downloads the weights from
+the Hugging Face Hub (or pass a local folder instead of the repo id).
+
+```bash
+# install this branch
+git clone -b feat/clef-flash https://github.com/YukiHSun/strands-decider && cd strands-decider
+pip install -e .    # or: uv pip install -e .
+
+# start one server (--port defaults to 8000; --device cuda / mps / cpu)
+strands-decider serve h2oai/h2o-lightning-4b --revision v1.2.3 --attention one-way --noul-floor 0 --device mps
+strands-decider serve Cloudflare/clef-flash --device cuda        # 9B; --device mps on a 32 GB+ Mac
+strands-decider serve Mapika/decider-4b --device mps
+strands-decider serve jaredpalmer/kev-4b --device mps
+strands-decider serve baselabs/elephant-1 --device mps --port 8748
+
+# check which engine it loaded
+curl -s http://127.0.0.1:8748/health
+
+# ask it (one request, any number of noul / choice / score questions)
+curl -s http://127.0.0.1:8748/v1/systemone -H 'content-type: application/json' -d '{
+  "state": "I was charged twice this month, please refund one of them.",
+  "questions": {
+    "refund": {"type": "noul", "instructions": "Is the customer asking for a refund?"},
+    "team": {"type": "choice", "instructions": "Which team should handle this?",
+             "criteria": {"billing": "Charges, refunds, invoices", "technical": "App or site faults"}}
+  }
+}'
+
+# or one question without a server
+strands-decider ask baselabs/elephant-1 --device mps --state "The door is open." --noul "Is the door open?"
+```
+
+| Model | Size on disk | Devices | Images | Notes |
+|---|---|---|---|---|
+| h2oai/h2o-lightning-4b | about 9 GB | cuda, mps, cpu, mlx (light builds), GGUF via llama-server | `--vision` | `--noul-floor 0` for raw yes/no probabilities ([docs/h2o-lightning.md](docs/h2o-lightning.md)) |
+| Cloudflare/clef-flash | about 19 GB | cuda, mps, cpu | always on | answers match the release's reference exactly ([docs/clef.md](docs/clef.md)) |
+| Mapika/decider-4b | about 8.5 GB | cuda, mps, cpu | no | yes/no answers at its own temperature 0.05 ([docs/mapika-decider.md](docs/mapika-decider.md)) |
+| jaredpalmer/kev-4b | adapter + about 9 GB base | cuda, mps, cpu | no | the base is downloaded and the LoRA merged at load ([docs/kev.md](docs/kev.md)) |
+| baselabs/elephant-1 | about 19 GB | cuda (24 GB is enough), mps (32 GB+ Mac), cpu | no | block attention from its `config.json`; mask-based attention only (sdpa or eager) ([docs/elephant.md](docs/elephant.md)) |
+
+To run the SO-101 kit against any of them, point it at the server:
+`DECIDER_URL=http://127.0.0.1:<port>` ([docs/so101-kit-checks.md](docs/so101-kit-checks.md#reproducing)).
 
 ### Images
 

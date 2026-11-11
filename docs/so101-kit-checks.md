@@ -23,6 +23,7 @@ reference.
 | [Cloudflare/clef-flash](https://huggingface.co/Cloudflare/clef-flash), 9B | this branch ([docs/clef.md](clef.md)) | 13 / 15 | 12 / 15 | 1 | 7 / 7 | not run | 1.8 s |
 | [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b) (`585473d`), 4B | this branch ([docs/mapika-decider.md](mapika-decider.md)); first run on its own server, [Mapika/decider](https://github.com/Mapika/decider) | 14 / 15 | 13 / 15 | 0 | 7 / 7 | 64.6% (its own server) | 1.1 s (1.4 s on its own) |
 | [jaredpalmer/kev-4b](https://huggingface.co/jaredpalmer/kev-4b) (`6cfce5c`), 4B | this branch ([docs/kev.md](kev.md)); first run on its own server, [jaredpalmer/kev](https://github.com/jaredpalmer/kev) (MLX) | 7 / 15 | 7 / 15 | 1 | 7 / 7 | no images | 1.2 s (0.8 s on its own, MLX) |
+| [baselabs/elephant-1](https://huggingface.co/baselabs/elephant-1) (`b3f8a93`), 9B | this branch ([docs/elephant.md](elephant.md)); reference: the release's runtime (OneJev qev + `serve.patch`) on a Colab L4 | 15 / 15 | 14 / 15 | 0 | 7 / 7 | not run | 2.2 s (0.42 s on the L4) |
 | Jev 1.14 (hosted) | TypeSafe API | 15 / 15 | 15 / 15 | 0 | 7 / 7 | 84.6% | 0.15 s |
 
 Notes:
@@ -42,8 +43,13 @@ Notes:
   and after the lift it chose `transfer` (confidence 0.53) instead of `secure_grasp`, which
   passed. This branch serves it too; on the kit it gave the same skill as the release's server on
   19 of 19 ([docs/kev.md](kev.md)).
-- With the revised wording, clef-flash and decider-4b both picked `secure_grasp`, a skill of the
-  other task, right after the cube-lift task's lift; the kit's wording may need another fix there.
+- **elephant-1** matched hosted Jev on every count with the kit's wording. This branch gave the
+  same skill and verdict as the release's runtime on all 19 steps, all 7 failures and all 19 steps
+  with the revised wording ([docs/elephant.md](elephant.md)). It needs a CUDA GPU on its own
+  runtime; this branch serves it on a Mac too.
+- With the revised wording, clef-flash, decider-4b and elephant-1 all picked `secure_grasp`, a
+  skill of the other task, right after the cube-lift task's lift; the kit's wording needs another
+  fix there.
 
 The per-request results are in the kit's `outputs/` folder (`decider_*_vs_jev_comparison.json`,
 `prompt_order_comparison_strict_anchored_*.json`, `eye_eval_*.json`).
@@ -60,6 +66,7 @@ command serves every model below (`--device cuda`, `mps` or `cpu`; `mlx` where n
 | Cloudflare/clef-flash | `strands-decider serve Cloudflare/clef-flash --device cuda` | `--device mps` on a 32 GB+ Mac; images always on ([docs/clef.md](clef.md)) |
 | Mapika/decider-4b | `strands-decider serve Mapika/decider-4b --device mps` | text only (images: its own server, below); yes/no answers at its own temperature 0.05 ([docs/mapika-decider.md](mapika-decider.md)) |
 | jaredpalmer/kev-4b | `strands-decider serve jaredpalmer/kev-4b --device mps` | text only; the base `Qwen/Qwen3.5-4B-Base` is downloaded and the LoRA merged at load ([docs/kev.md](kev.md)) |
+| baselabs/elephant-1 | `strands-decider serve baselabs/elephant-1 --device mps` | text only; about 19 GB (a 32 GB+ Mac, or a 24 GB GPU with `--device cuda`); block attention read from its `config.json` ([docs/elephant.md](elephant.md)) |
 
 `strands-decider ask <model> --state "..." --noul "..."` answers one question from the command
 line with the same loading rules. Point the kit at any of these servers with
@@ -116,6 +123,15 @@ python -m kev.serve --run jaredpalmer/kev-4b@6cfce5c2fa4b4bd64026336ab649c5ca788
 
 The kev server has no `/health`; it is ready when it prints `serving jaredpalmer/kev-4b@...`.
 
+### baselabs/elephant-1 (the release's runtime, on a Colab GPU)
+
+This branch serves it (`strands-decider serve baselabs/elephant-1 --revision b3f8a93462fb1051a9de031e94a7ff380e254072 --device mps`).
+Its own runtime needs one CUDA GPU; the reference answers came from it on a Colab L4, installed as
+the release's `setup.sh` does (OneJev `81ce62f` + the release's `serve.patch`, its pinned
+transformers and linear-attention kernels), then replayed to the kit from a small local server.
+The model must be loaded from a local directory: qev reads the block attention from
+`config.json` only for a local path, and serves a Hub id with plain causal attention.
+
 ### The kit's checks
 
 From the root of [pai-final-so101-open-decider](https://github.com/YukiHSun/pai-final-so101-open-decider),
@@ -138,5 +154,10 @@ H2O_URL=http://127.0.0.1:8743/v1/systemone H2O_TAG=mapika-decider-4b .venv/bin/p
 - **A skill of the other task.** `compare_prompt_order.py` stops when a model returns a skill the
   task does not have; this happened with the revised wording for clef-flash and decider-4b. That
   one request was counted as a wrong, stopped answer (a wrapper around the script's `ask`).
+- **elephant-1 on a 24 GB GPU.** qev copies the LM head to float32 on the GPU at load, which
+  briefly needs about 6 GB more and ran out of memory on the L4; the same cast done through the
+  CPU fits (peak 20.4 GB).
+- **A dropped Colab CLI connection.** `colab exec` can wait forever after "Connection was lost";
+  the job ran detached on the VM and was polled with short execs.
 - **torchvision.** Clef's and decider-4b's own processors load a video processor that needs
   torchvision. This branch's Clef engine uses the PIL image processor instead and does not need it.

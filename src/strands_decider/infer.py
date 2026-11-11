@@ -55,6 +55,7 @@ from .schema import (
 
 if TYPE_CHECKING:
     from .clef import ClefEngine
+    from .elephant import ElephantEngine
     from .h2o import H2OEngine
     from .kev import KevEngine
     from .mapika import MapikaEngine
@@ -456,7 +457,7 @@ def load_engine(
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
     noul_floor: float | None = None,
-) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine:
     """`_load_engine` (below), then `noul_floor` on an h2o-lightning engine: the yes/no floor its
     answers are committed to (None: the checkpoint's; 0: off). Not used for a strands-decider
     checkpoint, whose yes/no answers have no floor."""
@@ -493,7 +494,7 @@ def _load_engine(
     engine: str = "local",
     llama_server_url: str | None = None,
     llama_server_timeout: float = 60.0,
-) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine:
+) -> SystemOneEngine | H2OEngine | ClefEngine | MapikaEngine | KevEngine | ElephantEngine:
     """An engine on a torch device ("cuda", "mps", "cpu"), or on MLX with `device="mlx"`.
 
     An h2o-lightning checkpoint (`serve_config.json` and no decider config, see h2o.py) gives an
@@ -587,6 +588,21 @@ def _load_engine(
             raise ValueError("a Kev checkpoint runs on torch devices (cuda, mps, cpu), text only")
         return load_kev_engine(
             kev_path,
+            device=device,
+            model_name=os.path.basename(checkpoint.rstrip("/")) or checkpoint,
+            attn_implementation=attn_implementation,
+        )
+    from .elephant import load_elephant_engine
+    from .elephant import resolve as resolve_elephant
+
+    elephant_path = resolve_elephant(checkpoint, revision)
+    if elephant_path is not None:
+        if device == "mlx" or vision:
+            raise ValueError(
+                "a qev checkpoint (elephant-1) runs on torch devices (cuda, mps, cpu), text only"
+            )
+        return load_elephant_engine(
+            elephant_path,
             device=device,
             model_name=os.path.basename(checkpoint.rstrip("/")) or checkpoint,
             attn_implementation=attn_implementation,
