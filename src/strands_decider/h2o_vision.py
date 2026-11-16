@@ -8,7 +8,7 @@ The prompt is h2o.py's, with one `<|vision_start|><|image_pad|><|vision_end|>` p
 the user turn, before the record, as h2o's own serving places images. Each `<|image_pad|>` is
 expanded to the image's token count before the prompt is tokenised once.
 
-Each image is decoded and checked as `vision.decode_image` does (PNG, JPEG, WEBP or GIF, at most
+Each image is decoded and checked as `images.decode_image` does (PNG, JPEG, WEBP or GIF, at most
 4096 x 4096 pixels, EXIF rotation, transparency on white), shrunk to at most
 `serve_config.json`'s `image.max_pixels` (`fit_pixels`), and run through the checkpoint's
 `Qwen2VLImageProcessorPil`. The vision tower runs once per request (`prepare_images`); each
@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Any
 import torch
 
 from .h2o import H2OServeConfig, RenderedH2O, forward_layers
-from .vision import IMAGE_PAD, decode_image, expand_image_tokens, image_tokens_for_grid
+from .images import IMAGE_PAD, decode_image, expand_image_tokens, image_tokens_for_grid
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -54,7 +54,7 @@ def fit_pixels(img: Image.Image, max_pixels: int) -> Image.Image:
 
 
 def decode_images(images: Sequence[str], max_pixels: int) -> list[Image.Image]:
-    """A request's base64 images, checked and decoded (`vision.decode_image`) and shrunk to at
+    """A request's base64 images, checked and decoded (`images.decode_image`) and shrunk to at
     most `max_pixels` pixels each."""
     return [fit_pixels(decode_image(b), max_pixels) for b in images]
 
