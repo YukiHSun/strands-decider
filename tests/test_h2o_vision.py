@@ -28,8 +28,8 @@ from test_h2o import CHAT_TEMPLATE, LABELS, QUESTIONS, SERVE_CONFIG, write_label
 from typer.testing import CliRunner  # noqa: E402
 
 from strands_decider import cli, h2o, h2o_vision, infer, server  # noqa: E402
+from strands_decider.images import IMAGE_PAD, VISION_END, VISION_START  # noqa: E402
 from strands_decider.schema import SystemOneRequest, SystemOneResponse  # noqa: E402
-from strands_decider.vision import IMAGE_PAD, VISION_END, VISION_START  # noqa: E402
 
 STATE = "The form on the desk."
 IMAGE_SERVE_CONFIG = {
