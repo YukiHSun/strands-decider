@@ -120,8 +120,8 @@ B=outputs/elephant1_colab
 DECIDER_URL=http://127.0.0.1:8766 .venv/bin/python scripts/measure_option_order.py \
   $B/bodies/kit_compare.json $B/bodies/kit_order.json $B/bodies_rest/kit_order_rest.json \
   --tag h2o-lightning-4b --out outputs/option_order/h2o-lightning-4b.json
-.venv/bin/python scripts/summarize_option_order.py $B outputs/option_order/*.json    # pass / stop per order
-.venv/bin/python scripts/simulate_order_averaging.py $B outputs/option_order/*.json  # averaging, offline
+.venv/bin/python scripts/summarize_option_order.py $B outputs/option_order/h2o-lightning-4b.json    # pass / stop per order
+.venv/bin/python scripts/simulate_order_averaging.py $B outputs/option_order/h2o-lightning-4b.json  # averaging, offline
 ```
 
 The results of the three models are in the kit's `outputs/option_order/`.
