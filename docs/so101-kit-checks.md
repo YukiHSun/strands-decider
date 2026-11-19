@@ -54,6 +54,78 @@ Notes:
 The per-request results are in the kit's `outputs/` folder (`decider_*_vs_jev_comparison.json`,
 `prompt_order_comparison_strict_anchored_*.json`, `eye_eval_*.json`).
 
+## Option order
+
+Upstream [issue #151](https://github.com/strands-labs/strands-decider/issues/151) points out
+that a choice answer may depend on the order the options are listed in. The kit always lists its
+skills in the same order, so each run is repeatable, but a bias would go unseen. This was
+measured on 2026-11-19 for three models served by this branch (`749265c`) on a Colab L4
+(`--device cuda`, otherwise the serve commands below; strands-decider-2B is
+`StrandsAgents/strands-decider-2B-qwen3.5-v1-2610`). The other models were not measured.
+
+The kit's recorded `next_skill` requests (34 after removing duplicates: 25 steps that must pass
+with the next skill and 9 failed observations that must stop) were asked again with only the
+order of the options changed: the kit's own order, every cyclic rotation (each option at each
+position once), the reverse and 3 seeded shuffles, 9 to 14 orders per request and 418 calls per
+model. The state, the instructions and the yes/no gate stayed the same.
+
+| Model | Requests whose skill changed in some order | Mean / largest change in probabilities (TVD) | Mean probability at the first position, 5 / 7 / 10 options (uniform 0.20 / 0.14 / 0.10) | Steps passed, kit's order (kit's wording, 21) | Steps passed, another single order | Guarded skill passed on a failure |
+|---|---|---|---|---|---|---|
+| strands-decider-2B | 21 / 34 | 0.15 / 0.46 | 0.22 / 0.16 / 0.12 | 7 | 4 to 7 | 0 of 108 calls |
+| h2o-lightning-4b v1.2.3 | 8 / 34 | 0.09 / 0.86 | 0.19 / 0.16 / 0.11 | 21 | 18 to 21 | 0 of 108 calls |
+| clef-flash | 0 / 34 | 0 / 0 | 0.20 / 0.14 / 0.10 | 17 | 17 | 0 of 108 calls |
+
+- **clef-flash** sorts the options by name before it reads them, as its reference does
+  (`src/strands_decider/clef.py`), so every order gave the same probabilities, to the last digit.
+- **h2o-lightning-4b** passed every step of the kit's wording in the kit's order, but other orders
+  dropped up to 3 of them, and in some of those a wrong skill passed (up to 3 per order).
+- **strands-decider-2B** was the most order-sensitive and put a little more probability on the
+  first option, as the issue predicts. It passes few steps of this task in any order.
+- The safety gate is a separate yes/no question, so it held in every order: none of the three
+  passed the guarded skill on any of the 9 failed observations.
+
+The right-after-lift step shows how the kit's order had hidden this. The kit's comparison
+(`compare_prompt_order.py`) also asks that step in two older wordings. In h2o's answers the
+probability of the right skill, `secure_grasp`, ranged over the orders as follows:
+
+| Wording | Kit's order | Range over orders | Averaged over the rotations |
+|---|---|---|---|
+| `original` (2 requests) | `transfer` passed (wrong) | 0.01 to 0.07 | `transfer` |
+| `strict` (2 requests) | `secure_grasp`, confidence 0.49 and 0.56 | 0.03 to 0.75 | `transfer` |
+| `strict_anchored`, the kit's wording (2 requests) | `secure_grasp`, 0.86 and 0.90 | 0.29 to 0.94 | `secure_grasp`, 0.80 and 0.87 |
+
+**Averaging over orders** was estimated offline from the same answers: the probabilities and the
+gate's yes probability averaged over a set of orders, the confidence recomputed with
+`derive_confidence`, and the kit's gates applied. On the 21 steps of the kit's wording:
+
+| Rule (calls per decision) | strands-decider-2B | h2o-lightning-4b | clef-flash |
+|---|---|---|---|
+| kit's order (1) | 7 | 21 | 17 |
+| another single order (1) | 4 to 7 | 18 to 21 | 17 |
+| kit's order + reverse (2) | 7 | 20 | 17 |
+| 5 orders (5) | 7 | 20 | 17 |
+| every rotation (5 to 10) | 7 | 21 | 17 |
+
+Averaging over every rotation removes the dependence on the order (each option sits at each
+position once) and let no wrong skill pass for h2o, but it passed no more steps than the kit's
+order at 5 to 10 times the calls. Over all 25 steps, older wordings included, it passed fewer
+(21, against 23 in the kit's order), because the `strict` wording had passed only in the kit's
+order.
+Keep the order you tested; when you reorder the skills or add one, measure again.
+
+To measure a model (from the kit's folder, against any `POST /v1/systemone` server):
+
+```bash
+B=outputs/elephant1_colab
+DECIDER_URL=http://127.0.0.1:8766 .venv/bin/python scripts/measure_option_order.py \
+  $B/bodies/kit_compare.json $B/bodies/kit_order.json $B/bodies_rest/kit_order_rest.json \
+  --tag h2o-lightning-4b --out outputs/option_order/h2o-lightning-4b.json
+.venv/bin/python scripts/summarize_option_order.py $B outputs/option_order/*.json    # pass / stop per order
+.venv/bin/python scripts/simulate_order_averaging.py $B outputs/option_order/*.json  # averaging, offline
+```
+
+The results of the three models are in the kit's `outputs/option_order/`.
+
 ## Which models the `strands-decider` command runs
 
 `strands-decider serve` and `strands-decider ask` load a checkpoint by its kind, so the same

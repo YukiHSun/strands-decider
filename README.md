@@ -323,6 +323,24 @@ strands-decider ask baselabs/elephant-1 --device mps --state "The door is open."
 To run the SO-101 kit against any of them, point it at the server:
 `DECIDER_URL=http://127.0.0.1:<port>` ([docs/so101-kit-checks.md](docs/so101-kit-checks.md#reproducing)).
 
+#### Tip: re-check a choice question when you reorder its options
+
+Some of these models answer a choice question differently when only the order of its options
+changes (upstream [issue #151](https://github.com/strands-labs/strands-decider/issues/151)). The
+SO-101 kit's 34 recorded `next_skill` requests were asked again in 9 to 14 orders each (every
+rotation, the reverse and 3 shuffles), served by this branch on a Colab L4:
+
+- clef-flash gave the same probabilities in every order (it sorts the options before reading them);
+- h2o-lightning-4b v1.2.3 changed its skill on 8 of the 34. In the kit's own order all 21
+  successful steps with the kit's wording passed; in another single order, 18 to 21;
+- strands-decider-2B changed on 21 of the 34 and leaned slightly towards the first option;
+- in no order did any of the three pass a guarded skill on a deliberately failed observation.
+
+Averaging the probabilities over every rotation made the answers independent of the order, but
+passed no more steps and took 5 to 10 times the calls. So keep the option order you tested, and
+measure again when you reorder or add options
+([docs/so101-kit-checks.md](docs/so101-kit-checks.md#option-order)).
+
 ### Images
 
 Qwen3.5-2B-Base is natively multimodal. With `--vision` the server keeps its vision tower,
